@@ -14,25 +14,27 @@ BUILD_TYPE=release
 	dh $@ --with gir
 
 override_dh_auto_configure:
-	dh_auto_configure					\
+	dh_auto_configure						\
 	  --sourcedirectory=cpp					\
-	  --builddirectory=cpp_build				\
+	  --builddirectory=cpp_build			\
 	  --buildsystem=cmake+ninja				\
-	  --							\
-	  -DARROW_CUDA=OFF				\
-	  -DARROW_CSV=ON \
-	  -DARROW_COMPUTE=ON \
-	  -DARROW_DATASET=ON \
-	  -DARROW_JSON=ON \
-	  -DARROW_FILESYSTEM=ON \
-	  -DARROW_FLIGHT=ON					\
-	  -DARROW_GANDIVA=OFF					\
+	  --									\
+	  -DARROW_CUDA=ON						\
+	  -DARROW_CSV=ON 						\
+	  -DARROW_COMPUTE=ON 					\
+	  -DARROW_DATASET=ON 					\
+	  -DARROW_DEPENDENCY_SOURCE=SYSTEM		\
+	  -DARROW_JSON=ON 						\
+	  -DARROW_FILESYSTEM=ON					\
+	  -DARROW_FLIGHT=ON						\
+	  -DARROW_GANDIVA=ON					\
 	  -DARROW_GANDIVA_JAVA=OFF				\
-	  -DARROW_MIMALLOC=ON					\
-	  -DARROW_ORC=ON					\
+	  -DARROW_JEMALLOC=ON					\
+	  -DARROW_MIMALLOC=OFF					\
+	  -DARROW_ORC=OFF						\
 	  -DARROW_PARQUET=ON					\
-	  -DARROW_PLASMA=OFF			\
-	  -DARROW_PYTHON=ON					\
+	  -DARROW_PLASMA=ON						\
+	  -DARROW_PYTHON=ON						\
 	  -DARROW_S3=OFF						\
 	  -DARROW_USE_CCACHE=OFF				\
 	  -DARROW_WITH_BROTLI=ON				\
@@ -82,15 +84,7 @@ override_dh_auto_install:
 	  --builddirectory=cpp_build
 
 override_dh_auto_test:
-	# TODO: We need Boost 1.64 or later to build tests for
-	# Apache Arrow Flight.
-	# git clone --depth 1 https://github.com/apache/arrow-testing.git
-	# git clone --depth 1 https://github.com/apache/parquet-testing.git
-	# cd cpp_build &&								\
-	#   env									\
-	#     ARROW_TEST_DATA=$(CURDIR)/arrow-testing/data			\
-	#     PARQUET_TEST_DATA=$(CURDIR)/parquet-testing/data			\
-	#       ctest --exclude-regex 'arrow-cuda-test|plasma-client_tests'
+	# pass
 
 # skip file failing with "Unknown DWARF DW_OP_255" (see bug#949296)
 override_dh_dwz:
