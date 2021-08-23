@@ -1,0 +1,16 @@
+---
+Registry:
+ - Name: conda:conda-forge
+   Entry: arrow-cpp
+ - Name: conda:conda-forge
+   Entry: pyarrow
+ - Name: guix
+   Entry: python-pyarrow
+ - Name: guix
+   Entry: apache-arrow
+ - Name: SciCrunch
+   Entry: NA
+   Checked: 2021-08-23
+ - Name: bio.tools
+   Entry: NA
+   Checked: 2021-08-23
