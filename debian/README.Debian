@@ -1,6 +1,6 @@
 TODO for Debian Arrow
 ---------------------
 
-[ ] Update Maintainer/Uploader in d/control
+[X] Update Maintainer/Uploader in d/control
 [ ] Update d/copyright
 [ ] Optional: clean out embedded code (not too much IIR)
