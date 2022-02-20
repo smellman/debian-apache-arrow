@@ -167,7 +167,7 @@ class ARROW_EXPORT CudaMemoryManager : public MemoryManager {
   Result<std::shared_ptr<io::OutputStream>> GetBufferWriter(
       std::shared_ptr<Buffer> buf) override;
 
-  Result<std::shared_ptr<Buffer>> AllocateBuffer(int64_t size) override;
+  Result<std::unique_ptr<Buffer>> AllocateBuffer(int64_t size) override;
 
   /// \brief The CudaDevice instance tied to this MemoryManager
   ///
@@ -217,7 +217,7 @@ class ARROW_EXPORT CudaContext : public std::enable_shared_from_this<CudaContext
   /// \brief Allocate CUDA memory on GPU device for this context
   /// \param[in] nbytes number of bytes
   /// \return the allocated buffer
-  Result<std::shared_ptr<CudaBuffer>> Allocate(int64_t nbytes);
+  Result<std::unique_ptr<CudaBuffer>> Allocate(int64_t nbytes);
 
   /// \brief Release CUDA memory on GPU device for this context
   /// \param[in] device_ptr the buffer address
@@ -279,7 +279,8 @@ class ARROW_EXPORT CudaContext : public std::enable_shared_from_this<CudaContext
  private:
   CudaContext();
 
-  Result<std::shared_ptr<CudaIpcMemHandle>> ExportIpcBuffer(void* data, int64_t size);
+  Result<std::shared_ptr<CudaIpcMemHandle>> ExportIpcBuffer(const void* data,
+                                                            int64_t size);
   Status CopyHostToDevice(void* dst, const void* src, int64_t nbytes);
   Status CopyHostToDevice(uintptr_t dst, const void* src, int64_t nbytes);
   Status CopyDeviceToHost(void* dst, const void* src, int64_t nbytes);

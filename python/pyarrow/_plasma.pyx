@@ -17,7 +17,6 @@
 
 # cython: profile=False
 # distutils: language = c++
-# cython: embedsignature = True
 # cython: language_level = 3
 
 from libcpp cimport bool as c_bool, nullptr
@@ -358,9 +357,10 @@ cdef class PlasmaClient(_Weakrefable):
             This exception is raised if the object could not be created because
             there already is an object with the same ID in the plasma store.
 
-        PlasmaStoreFull: This exception is raised if the object could
-                not be created because the plasma store is unable to evict
-                enough objects to create room for it.
+        PlasmaStoreFull
+            This exception is raised if the object could
+            not be created because the plasma store is unable to evict
+            enough objects to create room for it.
         """
         cdef shared_ptr[CBuffer] data
         with nogil:
@@ -499,7 +499,8 @@ cdef class PlasmaClient(_Weakrefable):
 
         Returns
         -------
-        The object ID associated to the Python buffer object.
+        ObjectID
+            The object ID associated to the Python buffer object.
         """
         cdef ObjectID target_id = (object_id if object_id
                                    else ObjectID.from_random())
@@ -531,7 +532,8 @@ cdef class PlasmaClient(_Weakrefable):
 
         Returns
         -------
-        The object ID associated to the Python object.
+        ObjectID
+            The object ID associated to the Python object.
         """
         cdef ObjectID target_id = (object_id if object_id
                                    else ObjectID.from_random())

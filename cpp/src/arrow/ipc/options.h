@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "arrow/io/caching.h"
 #include "arrow/ipc/type_fwd.h"
 #include "arrow/status.h"
 #include "arrow/type_fwd.h"
@@ -75,7 +76,7 @@ struct ARROW_EXPORT IpcWriteOptions {
   /// If false, a changed dictionary for a given field will emit a full
   /// dictionary replacement.
   /// If true, a changed dictionary will be compared against the previous
-  /// version. If possible, a dictionary delta will be omitted, otherwise
+  /// version. If possible, a dictionary delta will be emitted, otherwise
   /// a full dictionary replacement.
   ///
   /// Default is false to maximize stream compatibility.
@@ -86,14 +87,14 @@ struct ARROW_EXPORT IpcWriteOptions {
 
   /// \brief Whether to unify dictionaries for the IPC file format
   ///
-  /// The IPC file format doesn't support dictionary replacements or deltas.
+  /// The IPC file format doesn't support dictionary replacements.
   /// Therefore, chunks of a column with a dictionary type must have the same
-  /// dictionary in each record batch.
+  /// dictionary in each record batch (or an extended dictionary + delta).
   ///
   /// If this option is true, RecordBatchWriter::WriteTable will attempt
   /// to unify dictionaries across each table column.  If this option is
-  /// false, unequal dictionaries across a table column will simply raise
-  /// an error.
+  /// false, incompatible dictionaries across a table column will simply
+  /// raise an error.
   ///
   /// Note that enabling this option has a runtime cost. Also, not all types
   /// currently support dictionary unification.
@@ -126,8 +127,7 @@ struct ARROW_EXPORT IpcReadOptions {
   /// memory in some cases (for example if compression is enabled).
   MemoryPool* memory_pool = default_memory_pool();
 
-  /// \brief EXPERIMENTAL: Top-level schema fields to include when
-  /// deserializing RecordBatch.
+  /// \brief Top-level schema fields to include when deserializing RecordBatch.
   ///
   /// If empty (the default), return all deserialized fields.
   /// If non-empty, the values are the indices of fields in the top-level schema.
@@ -137,7 +137,7 @@ struct ARROW_EXPORT IpcReadOptions {
   /// like decompression
   bool use_threads = true;
 
-  /// \brief EXPERIMENTAL: Convert incoming data to platform-native endianness
+  /// \brief Whether to convert incoming data to platform-native endianness
   ///
   /// If the endianness of the received schema is not equal to platform-native
   /// endianness, then all buffers with endian-sensitive data will be byte-swapped.
@@ -148,6 +148,11 @@ struct ARROW_EXPORT IpcReadOptions {
   /// Endianness conversion is achieved by the RecordBatchFileReader,
   /// RecordBatchStreamReader and StreamDecoder classes.
   bool ensure_native_endian = true;
+
+  /// \brief Options to control caching behavior when pre-buffering is requested
+  ///
+  /// The lazy property will always be reset to true to deliver the expected behavior
+  io::CacheOptions pre_buffer_cache_options = io::CacheOptions::LazyDefaults();
 
   static IpcReadOptions Defaults();
 };

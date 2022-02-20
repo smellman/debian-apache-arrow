@@ -63,6 +63,16 @@ class ARROW_EXPORT Table {
                                      const std::vector<std::shared_ptr<Array>>& arrays,
                                      int64_t num_rows = -1);
 
+  /// \brief Create an empty Table of a given schema
+  ///
+  /// The output Table will be created with a single empty chunk per column.
+  ///
+  /// \param[in] schema the schema of the empty Table
+  /// \param[in] pool the memory pool to allocate memory from
+  /// \return the resulting Table
+  static Result<std::shared_ptr<Table>> MakeEmpty(
+      std::shared_ptr<Schema> schema, MemoryPool* pool = default_memory_pool());
+
   /// \brief Construct a Table from a RecordBatchReader.
   ///
   /// \param[in] reader the arrow::Schema for each batch
@@ -92,13 +102,13 @@ class ARROW_EXPORT Table {
       const std::shared_ptr<ChunkedArray>& array);
 
   /// \brief Return the table schema
-  std::shared_ptr<Schema> schema() const { return schema_; }
+  const std::shared_ptr<Schema>& schema() const { return schema_; }
 
   /// \brief Return a column by index
   virtual std::shared_ptr<ChunkedArray> column(int i) const = 0;
 
   /// \brief Return vector of all columns for table
-  std::vector<std::shared_ptr<ChunkedArray>> columns() const;
+  virtual const std::vector<std::shared_ptr<ChunkedArray>>& columns() const = 0;
 
   /// Return a column's field by index
   std::shared_ptr<Field> field(int i) const { return schema_->field(i); }
@@ -151,7 +161,7 @@ class ARROW_EXPORT Table {
   /// \brief Return new table with specified columns
   Result<std::shared_ptr<Table>> SelectColumns(const std::vector<int>& indices) const;
 
-  /// \brief Replace schema key-value metadata with new metadata (EXPERIMENTAL)
+  /// \brief Replace schema key-value metadata with new metadata
   /// \since 0.5.0
   ///
   /// \param[in] metadata new KeyValueMetadata
@@ -206,6 +216,15 @@ class ARROW_EXPORT Table {
   ///
   /// \param[in] pool The pool for buffer allocations
   Result<std::shared_ptr<Table>> CombineChunks(
+      MemoryPool* pool = default_memory_pool()) const;
+
+  /// \brief Make a new record batch by combining the chunks this table has.
+  ///
+  /// All the underlying chunks in the ChunkedArray of each column are
+  /// concatenated into a single chunk.
+  ///
+  /// \param[in] pool The pool for buffer allocations
+  Result<std::shared_ptr<RecordBatch>> CombineChunksToBatch(
       MemoryPool* pool = default_memory_pool()) const;
 
  protected:

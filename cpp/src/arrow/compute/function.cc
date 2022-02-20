@@ -21,34 +21,74 @@
 #include <memory>
 #include <sstream>
 
+#include "arrow/compute/api_scalar.h"
 #include "arrow/compute/cast.h"
 #include "arrow/compute/exec.h"
 #include "arrow/compute/exec_internal.h"
+#include "arrow/compute/function_internal.h"
 #include "arrow/compute/kernels/common.h"
+#include "arrow/compute/registry.h"
 #include "arrow/datum.h"
 #include "arrow/util/cpu_info.h"
+#include "arrow/util/logging.h"
 
 namespace arrow {
 
 using internal::checked_cast;
 
 namespace compute {
+Result<std::shared_ptr<Buffer>> FunctionOptionsType::Serialize(
+    const FunctionOptions&) const {
+  return Status::NotImplemented("Serialize for ", type_name());
+}
+
+Result<std::unique_ptr<FunctionOptions>> FunctionOptionsType::Deserialize(
+    const Buffer& buffer) const {
+  return Status::NotImplemented("Deserialize for ", type_name());
+}
+
+std::string FunctionOptions::ToString() const { return options_type()->Stringify(*this); }
+
+bool FunctionOptions::Equals(const FunctionOptions& other) const {
+  if (this == &other) return true;
+  if (options_type() != other.options_type()) return false;
+  return options_type()->Compare(*this, other);
+}
+
+std::unique_ptr<FunctionOptions> FunctionOptions::Copy() const {
+  return options_type()->Copy(*this);
+}
+
+Result<std::shared_ptr<Buffer>> FunctionOptions::Serialize() const {
+  return options_type()->Serialize(*this);
+}
+
+Result<std::unique_ptr<FunctionOptions>> FunctionOptions::Deserialize(
+    const std::string& type_name, const Buffer& buffer) {
+  ARROW_ASSIGN_OR_RAISE(auto options,
+                        GetFunctionRegistry()->GetFunctionOptionsType(type_name));
+  return options->Deserialize(buffer);
+}
+
+void PrintTo(const FunctionOptions& options, std::ostream* os) {
+  *os << options.ToString();
+}
 
 static const FunctionDoc kEmptyFunctionDoc{};
 
 const FunctionDoc& FunctionDoc::Empty() { return kEmptyFunctionDoc; }
 
-static Status CheckArityImpl(const Function* function, int passed_num_args,
+static Status CheckArityImpl(const Function& function, int passed_num_args,
                              const char* passed_num_args_label) {
-  if (function->arity().is_varargs && passed_num_args < function->arity().num_args) {
-    return Status::Invalid("VarArgs function ", function->name(), " needs at least ",
-                           function->arity().num_args, " arguments but ",
+  if (function.arity().is_varargs && passed_num_args < function.arity().num_args) {
+    return Status::Invalid("VarArgs function '", function.name(), "' needs at least ",
+                           function.arity().num_args, " arguments but ",
                            passed_num_args_label, " only ", passed_num_args);
   }
 
-  if (!function->arity().is_varargs && passed_num_args != function->arity().num_args) {
-    return Status::Invalid("Function ", function->name(), " accepts ",
-                           function->arity().num_args, " arguments but ",
+  if (!function.arity().is_varargs && passed_num_args != function.arity().num_args) {
+    return Status::Invalid("Function '", function.name(), "' accepts ",
+                           function.arity().num_args, " arguments but ",
                            passed_num_args_label, " ", passed_num_args);
   }
 
@@ -56,19 +96,27 @@ static Status CheckArityImpl(const Function* function, int passed_num_args,
 }
 
 Status Function::CheckArity(const std::vector<InputType>& in_types) const {
-  return CheckArityImpl(this, static_cast<int>(in_types.size()), "kernel accepts");
+  return CheckArityImpl(*this, static_cast<int>(in_types.size()), "kernel accepts");
 }
 
 Status Function::CheckArity(const std::vector<ValueDescr>& descrs) const {
-  return CheckArityImpl(this, static_cast<int>(descrs.size()),
+  return CheckArityImpl(*this, static_cast<int>(descrs.size()),
                         "attempted to look up kernel(s) with");
+}
+
+static Status CheckOptions(const Function& function, const FunctionOptions* options) {
+  if (options == nullptr && function.doc().options_required) {
+    return Status::Invalid("Function '", function.name(),
+                           "' cannot be called without options");
+  }
+  return Status::OK();
 }
 
 namespace detail {
 
 Status NoMatchingKernel(const Function* func, const std::vector<ValueDescr>& descrs) {
-  return Status::NotImplemented("Function ", func->name(),
-                                " has no kernel matching input types ",
+  return Status::NotImplemented("Function '", func->name(),
+                                "' has no kernel matching input types ",
                                 ValueDescr::ToString(descrs));
 }
 
@@ -157,6 +205,7 @@ Result<const Kernel*> Function::DispatchBest(std::vector<ValueDescr>* values) co
 Result<Datum> Function::Execute(const std::vector<Datum>& args,
                                 const FunctionOptions* options, ExecContext* ctx) const {
   if (options == nullptr) {
+    RETURN_NOT_OK(CheckOptions(*this, options));
     options = default_options();
   }
   if (ctx == nullptr) {
@@ -179,8 +228,7 @@ Result<Datum> Function::Execute(const std::vector<Datum>& args,
 
   KernelContext kernel_ctx{ctx};
   if (kernel->init) {
-    state = kernel->init(&kernel_ctx, {kernel, inputs, options});
-    RETURN_NOT_OK(kernel_ctx.status());
+    ARROW_ASSIGN_OR_RAISE(state, kernel->init(&kernel_ctx, {kernel, inputs, options}));
     kernel_ctx.SetState(state.get());
   }
 
@@ -196,23 +244,65 @@ Result<Datum> Function::Execute(const std::vector<Datum>& args,
   }
   RETURN_NOT_OK(executor->Init(&kernel_ctx, {kernel, inputs, options}));
 
-  auto listener = std::make_shared<detail::DatumAccumulator>();
-  RETURN_NOT_OK(executor->Execute(implicitly_cast_args, listener.get()));
-  return executor->WrapResults(implicitly_cast_args, listener->values());
+  detail::DatumAccumulator listener;
+  RETURN_NOT_OK(executor->Execute(implicitly_cast_args, &listener));
+  const auto out = executor->WrapResults(implicitly_cast_args, listener.values());
+#ifndef NDEBUG
+  DCHECK_OK(executor->CheckResultType(out, name_.c_str()));
+#endif
+  return out;
 }
+
+namespace {
+
+Status ValidateFunctionSummary(const std::string& s) {
+  if (s.find('\n') != s.npos) {
+    return Status::Invalid("summary contains a newline");
+  }
+  if (s.back() == '.') {
+    return Status::Invalid("summary ends with a point");
+  }
+  return Status::OK();
+}
+
+Status ValidateFunctionDescription(const std::string& s) {
+  if (!s.empty() && s.back() == '\n') {
+    return Status::Invalid("description ends with a newline");
+  }
+  constexpr int kMaxLineSize = 78;
+  int cur_line_size = 0;
+  for (const auto c : s) {
+    cur_line_size = (c == '\n') ? 0 : cur_line_size + 1;
+    if (cur_line_size > kMaxLineSize) {
+      return Status::Invalid("description line length exceeds ", kMaxLineSize,
+                             " characters");
+    }
+  }
+  return Status::OK();
+}
+
+}  // namespace
 
 Status Function::Validate() const {
   if (!doc_->summary.empty()) {
     // Documentation given, check its contents
     int arg_count = static_cast<int>(doc_->arg_names.size());
-    if (arg_count == arity_.num_args) {
-      return Status::OK();
+    // Some varargs functions allow 0 vararg, others expect at least 1,
+    // hence the two possible values below.
+    bool arg_count_match = (arg_count == arity_.num_args) ||
+                           (arity_.is_varargs && arg_count == arity_.num_args + 1);
+    if (!arg_count_match) {
+      return Status::Invalid(
+          "In function '", name_,
+          "': ", "number of argument names for function documentation != function arity");
     }
-    if (arity_.is_varargs && arg_count == arity_.num_args + 1) {
-      return Status::OK();
+    Status st = ValidateFunctionSummary(doc_->summary);
+    if (st.ok()) {
+      st &= ValidateFunctionDescription(doc_->description);
     }
-    return Status::Invalid("In function '", name_,
-                           "': ", "number of argument names != function arity");
+    if (!st.ok()) {
+      return st.WithMessage("In function '", name_, "': ", st.message());
+    }
   }
   return Status::OK();
 }
@@ -283,7 +373,8 @@ Result<Datum> MetaFunction::Execute(const std::vector<Datum>& args,
                                     const FunctionOptions* options,
                                     ExecContext* ctx) const {
   RETURN_NOT_OK(
-      CheckArityImpl(this, static_cast<int>(args.size()), "attempted to Execute with"));
+      CheckArityImpl(*this, static_cast<int>(args.size()), "attempted to Execute with"));
+  RETURN_NOT_OK(CheckOptions(*this, options));
 
   if (options == nullptr) {
     options = default_options();

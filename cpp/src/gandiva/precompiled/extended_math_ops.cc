@@ -28,6 +28,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "./types.h"
 
 // Expand the inner fn for types that support extended math.
@@ -226,6 +227,49 @@ gdv_int32 round_int32(gdv_int32 num) { return num; }
 FORCE_INLINE
 gdv_int64 round_int64(gdv_int64 num) { return num; }
 
+// Lookup table to make the factorial function to execute faster
+// It is used because the range of values for the function is limited to [0!-20!]
+static const int64_t kFactorialLookupTable[] = {1,
+                                                1,
+                                                2,
+                                                6,
+                                                24,
+                                                120,
+                                                720,
+                                                5040,
+                                                40320,
+                                                362880,
+                                                3628800,
+                                                39916800,
+                                                479001600,
+                                                6227020800,
+                                                87178291200,
+                                                1307674368000,
+                                                20922789888000,
+                                                355687428096000,
+                                                6402373705728000,
+                                                121645100408832000,
+                                                2432902008176640000};
+
+#define FACTORIAL(IN_TYPE)                                                          \
+  FORCE_INLINE                                                                      \
+  gdv_int64 factorial_##IN_TYPE(gdv_int64 ctx, gdv_##IN_TYPE value) {               \
+    if (value < 0) {                                                                \
+      gdv_fn_context_set_error_msg(ctx, "Factorial of negative number not exist!"); \
+      return 0;                                                                     \
+    }                                                                               \
+    /* For numbers greater than 20 causes an overflow. */                           \
+    if (value > 20) {                                                               \
+      gdv_fn_context_set_error_msg(ctx, "Numbers greater than 20 cause overflow!"); \
+      return 0;                                                                     \
+    }                                                                               \
+                                                                                    \
+    return kFactorialLookupTable[static_cast<int32_t>(value)];                      \
+  }
+
+FACTORIAL(int32)
+FACTORIAL(int64)
+
 // rounds the number to the nearest integer
 #define ROUND_DECIMAL(TYPE)                                                 \
   FORCE_INLINE                                                              \
@@ -235,6 +279,21 @@ gdv_int64 round_int64(gdv_int64 num) { return num; }
 
 ROUND_DECIMAL(float32)
 ROUND_DECIMAL(float64)
+
+// rounds the number to the nearest integer
+FORCE_INLINE
+gdv_float64 bround_float64(gdv_float64 num) {
+  gdv_float64 round_num = round(num);
+  gdv_float64 diff_num = round_num - num;
+  if ((diff_num != 0.5) && (diff_num != -0.5)) {
+    return round_num;
+  }
+  if (fmod(round_num, 2.0) == 0.0) {
+    return round_num;
+  }
+
+  return num - diff_num;
+}
 
 // rounds the number to the given scale
 #define ROUND_DECIMAL_TO_SCALE(TYPE)                                        \
@@ -366,5 +425,45 @@ gdv_float64 get_scale_multiplier(gdv_int32 scale) {
   }
   return power_float64_float64(10.0, scale);
 }
+
+// returns the binary representation of a given integer (e.g. 928 -> 1110100000)
+#define BIN_INTEGER(IN_TYPE)                                                          \
+  FORCE_INLINE                                                                        \
+  const char* bin_##IN_TYPE(int64_t context, gdv_##IN_TYPE value, int32_t* out_len) { \
+    *out_len = 0;                                                                     \
+    int32_t len = 8 * sizeof(value);                                                  \
+    char* ret = reinterpret_cast<char*>(gdv_fn_context_arena_malloc(context, len));   \
+    if (ret == nullptr) {                                                             \
+      gdv_fn_context_set_error_msg(context, "Could not allocate memory for output");  \
+      return "";                                                                      \
+    }                                                                                 \
+    /* handle case when value is zero */                                              \
+    if (value == 0) {                                                                 \
+      *out_len = 1;                                                                   \
+      ret[0] = '0';                                                                   \
+      return ret;                                                                     \
+    }                                                                                 \
+    /* generate binary representation iteratively */                                  \
+    gdv_u##IN_TYPE i;                                                                 \
+    int8_t count = 0;                                                                 \
+    bool first = false; /* flag for not printing left zeros in positive numbers */    \
+    for (i = static_cast<gdv_u##IN_TYPE>(1) << (len - 1); i > 0; i = i / 2) {         \
+      if ((value & i) != 0) {                                                         \
+        ret[count] = '1';                                                             \
+        if (!first) first = true;                                                     \
+      } else {                                                                        \
+        if (!first) continue;                                                         \
+        ret[count] = '0';                                                             \
+      }                                                                               \
+      count += 1;                                                                     \
+    }                                                                                 \
+    *out_len = count;                                                                 \
+    return ret;                                                                       \
+  }
+
+BIN_INTEGER(int32)
+BIN_INTEGER(int64)
+
+#undef BIN_INTEGER
 
 }  // extern "C"

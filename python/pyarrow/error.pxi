@@ -25,6 +25,8 @@ import os
 import signal
 import threading
 
+from pyarrow.util import _break_traceback_cycle_from_frame
+
 
 class ArrowException(Exception):
     pass
@@ -161,7 +163,7 @@ def enable_signal_handlers(c_bool enable):
 
     Parameters
     ----------
-    enable: bool
+    enable : bool
         Whether to enable user interruption by setting a temporary
         signal handler.
     """
@@ -170,6 +172,11 @@ def enable_signal_handlers(c_bool enable):
 
 
 # For internal use
+
+# Whether we need a workaround for https://bugs.python.org/issue42248
+have_signal_refcycle = (sys.version_info < (3, 8, 10) or
+                        (3, 9) <= sys.version_info < (3, 9, 5) or
+                        sys.version_info[:2] == (3, 10))
 
 cdef class SignalStopHandler:
     cdef:
@@ -180,19 +187,23 @@ cdef class SignalStopHandler:
     def __cinit__(self):
         self._enabled = False
 
-        tid = threading.current_thread().ident
+        self._init_signals()
+        if have_signal_refcycle:
+            _break_traceback_cycle_from_frame(sys._getframe(0))
+
+        self._stop_token = StopToken()
+        if not self._signals.empty():
+            self._stop_token.init(GetResultValue(
+                SetSignalStopSource()).token())
+            self._enabled = True
+
+    def _init_signals(self):
         if (signal_handlers_enabled and
                 threading.current_thread() is threading.main_thread()):
             self._signals = [
                 sig for sig in (signal.SIGINT, signal.SIGTERM)
                 if signal.getsignal(sig) not in (signal.SIG_DFL,
                                                  signal.SIG_IGN, None)]
-
-        if not self._signals.empty():
-            self._stop_token = StopToken()
-            self._stop_token.init(GetResultValue(
-                SetSignalStopSource()).token())
-            self._enabled = True
 
     def __enter__(self):
         if self._enabled:
@@ -202,6 +213,12 @@ cdef class SignalStopHandler:
     def __exit__(self, exc_type, exc_value, exc_tb):
         if self._enabled:
             UnregisterCancellingSignalHandler()
+        if exc_value is None:
+            # Make sure we didn't lose a signal
+            try:
+                check_status(self._stop_token.stop_token.Poll())
+            except ArrowCancelled as e:
+                exc_value = e
         if isinstance(exc_value, ArrowCancelled):
             if exc_value.signum:
                 # Re-emit the exact same signal. We restored the Python signal
@@ -209,7 +226,8 @@ cdef class SignalStopHandler:
                 if os.name == 'nt':
                     SendSignal(exc_value.signum)
                 else:
-                    SendSignalToThread(exc_value.signum, threading.get_ident())
+                    SendSignalToThread(exc_value.signum,
+                                       threading.main_thread().ident)
             else:
                 # Simulate Python receiving a SIGINT
                 # (see https://bugs.python.org/issue43356 for why we can't

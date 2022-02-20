@@ -16,10 +16,10 @@
 // under the License.
 
 #include <gtest/gtest.h>
-#include <time.h>
 
-#include "../execution_context.h"
+#include "gandiva/execution_context.h"
 #include "gandiva/precompiled/testing.h"
+#include "gandiva/precompiled/time_constants.h"
 #include "gandiva/precompiled/types.h"
 
 namespace gandiva {
@@ -132,6 +132,48 @@ TEST(TestTime, TestCastTimestamp) {
   context.Reset();
 }
 
+TEST(TestTime, TestCastTimeUtf8) {
+  ExecutionContext context;
+  auto context_ptr = reinterpret_cast<int64_t>(&context);
+
+  EXPECT_EQ(castTIME_utf8(context_ptr, "9:45:30", 7), 35130000);
+  EXPECT_EQ(castTIME_utf8(context_ptr, "9:45:30.920", 11), 35130920);
+
+  EXPECT_EQ(castTIME_utf8(context_ptr, "9:45:30.1", 9),
+            castTIME_utf8(context_ptr, "9:45:30", 7) + 100);
+
+  EXPECT_EQ(castTIME_utf8(context_ptr, "9:45:30.10", 10),
+            castTIME_utf8(context_ptr, "9:45:30", 7) + 100);
+
+  EXPECT_EQ(castTIME_utf8(context_ptr, "9:45:30.100", 11),
+            castTIME_utf8(context_ptr, "9:45:30", 7) + 100);
+
+  // error cases
+  EXPECT_EQ(castTIME_utf8(context_ptr, "24H00H00", 8), 0);
+  EXPECT_EQ(context.get_error(), "Invalid character in time 24H00H00");
+  context.Reset();
+
+  EXPECT_EQ(castTIME_utf8(context_ptr, "24:00:00", 8), 0);
+  EXPECT_EQ(context.get_error(), "Not a valid time value 24:00:00");
+  context.Reset();
+
+  EXPECT_EQ(castTIME_utf8(context_ptr, "00:60:00", 8), 0);
+  EXPECT_EQ(context.get_error(), "Not a valid time value 00:60:00");
+  context.Reset();
+
+  EXPECT_EQ(castTIME_utf8(context_ptr, "00:00:100", 9), 0);
+  EXPECT_EQ(context.get_error(), "Not a valid time value 00:00:100");
+  context.Reset();
+
+  EXPECT_EQ(castTIME_utf8(context_ptr, "00:00:00.0001", 13), 0);
+  EXPECT_EQ(context.get_error(), "Invalid millis for time value 00:00:00.0001");
+  context.Reset();
+
+  EXPECT_EQ(castTIME_utf8(context_ptr, "00:00:00.1000", 13), 0);
+  EXPECT_EQ(context.get_error(), "Invalid millis for time value 00:00:00.1000");
+  context.Reset();
+}
+
 #ifndef _WIN32
 
 // TODO(wesm): ARROW-4495. Need to address TZ database issues on Windows
@@ -179,6 +221,36 @@ TEST(TestTime, TestExtractTime) {
   EXPECT_EQ(extractHour_time32(time_as_millis_in_day), 10);
   EXPECT_EQ(extractMinute_time32(time_as_millis_in_day), 20);
   EXPECT_EQ(extractSecond_time32(time_as_millis_in_day), 33);
+}
+
+TEST(TestTime, TestTimestampDiffMonth) {
+  gdv_timestamp ts1 = StringToTimestamp("2019-06-30 00:00:00");
+  gdv_timestamp ts2 = StringToTimestamp("2019-05-31 00:00:00");
+  EXPECT_EQ(timestampdiffMonth_timestamp_timestamp(ts1, ts2), -1);
+
+  ts1 = StringToTimestamp("2019-06-30 00:00:00");
+  ts2 = StringToTimestamp("2019-02-28 00:00:00");
+  EXPECT_EQ(timestampdiffMonth_timestamp_timestamp(ts1, ts2), -4);
+
+  ts1 = StringToTimestamp("2019-06-30 00:00:00");
+  ts2 = StringToTimestamp("2019-03-31 00:00:00");
+  EXPECT_EQ(timestampdiffMonth_timestamp_timestamp(ts1, ts2), -3);
+
+  ts1 = StringToTimestamp("2019-06-30 00:00:00");
+  ts2 = StringToTimestamp("2019-06-30 00:00:00");
+  EXPECT_EQ(timestampdiffMonth_timestamp_timestamp(ts1, ts2), 0);
+
+  ts1 = StringToTimestamp("2019-06-30 00:00:00");
+  ts2 = StringToTimestamp("2019-07-31 00:00:00");
+  EXPECT_EQ(timestampdiffMonth_timestamp_timestamp(ts1, ts2), 1);
+
+  ts1 = StringToTimestamp("2019-06-30 00:00:00");
+  ts2 = StringToTimestamp("2019-07-30 00:00:00");
+  EXPECT_EQ(timestampdiffMonth_timestamp_timestamp(ts1, ts2), 1);
+
+  ts1 = StringToTimestamp("2019-06-30 00:00:00");
+  ts2 = StringToTimestamp("2019-07-29 00:00:00");
+  EXPECT_EQ(timestampdiffMonth_timestamp_timestamp(ts1, ts2), 0);
 }
 
 TEST(TestTime, TestExtractTimestamp) {
@@ -264,7 +336,15 @@ TEST(TestTime, TimeStampAdd) {
       StringToTimestamp("2000-05-01 10:21:04"));
 
   EXPECT_EQ(
+      timestampaddSecond_timestamp_int32(StringToTimestamp("2000-05-01 10:20:34"), 30),
+      StringToTimestamp("2000-05-01 10:21:04"));
+
+  EXPECT_EQ(
       timestampaddMinute_int64_timestamp(-30, StringToTimestamp("2000-05-01 10:20:34")),
+      StringToTimestamp("2000-05-01 09:50:34"));
+
+  EXPECT_EQ(
+      timestampaddMinute_timestamp_int64(StringToTimestamp("2000-05-01 10:20:34"), -30),
       StringToTimestamp("2000-05-01 09:50:34"));
 
   EXPECT_EQ(
@@ -272,15 +352,44 @@ TEST(TestTime, TimeStampAdd) {
       StringToTimestamp("2000-05-02 06:20:34"));
 
   EXPECT_EQ(
+      timestampaddHour_timestamp_int32(StringToTimestamp("2000-05-01 10:20:34"), 20),
+      StringToTimestamp("2000-05-02 06:20:34"));
+
+  EXPECT_EQ(
       timestampaddDay_int64_timestamp(-35, StringToTimestamp("2000-05-01 10:20:34")),
+      StringToTimestamp("2000-03-27 10:20:34"));
+
+  EXPECT_EQ(
+      timestampaddDay_timestamp_int64(StringToTimestamp("2000-05-01 10:20:34"), -35),
       StringToTimestamp("2000-03-27 10:20:34"));
 
   EXPECT_EQ(timestampaddWeek_int32_timestamp(4, StringToTimestamp("2000-05-01 10:20:34")),
             StringToTimestamp("2000-05-29 10:20:34"));
 
+  EXPECT_EQ(timestampaddWeek_timestamp_int32(StringToTimestamp("2000-05-01 10:20:34"), 4),
+            StringToTimestamp("2000-05-29 10:20:34"));
+
+  EXPECT_EQ(timestampaddWeek_timestamp_int32(StringToTimestamp("2000-05-01 10:20:34"), 4),
+            StringToTimestamp("2000-05-29 10:20:34"));
+
   EXPECT_EQ(
       timestampaddMonth_int64_timestamp(10, StringToTimestamp("2000-05-01 10:20:34")),
       StringToTimestamp("2001-03-01 10:20:34"));
+
+  EXPECT_EQ(
+      timestampaddMonth_int64_timestamp(1, StringToTimestamp("2000-01-31 10:20:34")),
+      StringToTimestamp("2000-2-29 10:20:34"));
+  EXPECT_EQ(
+      timestampaddMonth_int64_timestamp(13, StringToTimestamp("2001-01-31 10:20:34")),
+      StringToTimestamp("2002-02-28 10:20:34"));
+
+  EXPECT_EQ(
+      timestampaddMonth_int64_timestamp(11, StringToTimestamp("2000-05-31 10:20:34")),
+      StringToTimestamp("2001-04-30 10:20:34"));
+
+  EXPECT_EQ(
+      timestampaddMonth_timestamp_int64(StringToTimestamp("2000-05-31 10:20:34"), 11),
+      StringToTimestamp("2001-04-30 10:20:34"));
 
   EXPECT_EQ(
       timestampaddQuarter_int32_timestamp(-2, StringToTimestamp("2000-05-01 10:20:34")),
@@ -644,6 +753,11 @@ TEST(TestTime, TestExtractWeek) {
   }
 }
 
+TEST(TestTime, TestIsNullInterval) {
+  EXPECT_EQ(isnull_day_time_interval(150, true), false);
+  EXPECT_EQ(isnull_day_time_interval(150, false), true);
+}
+
 TEST(TestTime, TestMonthsBetween) {
   std::vector<std::string> testStrings = {
       "1995-03-02 00:00:00", "1995-02-02 00:00:00", "1.0",
@@ -718,6 +832,28 @@ TEST(TestTime, TestCastTimestampToTime) {
   EXPECT_EQ(expected_response, out);
 }
 
+TEST(TestTime, TestIntToTime) {
+  int32_t val = 1000;
+  int32_t expected_response = val;
+  auto out = castTIME_int32(val);
+  EXPECT_EQ(expected_response, out);
+
+  val = MILLIS_IN_DAY - 1;
+  expected_response = val;
+  out = castTIME_int32(val);
+  EXPECT_EQ(expected_response, out);
+
+  val = MILLIS_IN_DAY + 1;
+  expected_response = 1;
+  out = castTIME_int32(val);
+  EXPECT_EQ(expected_response, out);
+
+  val = -1;
+  expected_response = 0;
+  out = castTIME_int32(val);
+  EXPECT_EQ(expected_response, out);
+}
+
 TEST(TestTime, TestLastDay) {
   // leap year test
   gdv_timestamp ts = StringToTimestamp("2016-02-11 03:20:34");
@@ -741,6 +877,146 @@ TEST(TestTime, TestLastDay) {
   ts = StringToTimestamp("2015-12-03 03:12:59");
   out = last_day_from_timestamp(ts);
   EXPECT_EQ(StringToTimestamp("2015-12-31 00:00:00"), out);
+}
+
+TEST(TestTime, TestToTimestamp) {
+  auto ts = StringToTimestamp("1970-01-01 00:00:00");
+  EXPECT_EQ(ts, to_timestamp_int32(0));
+  EXPECT_EQ(ts, to_timestamp_int64(0));
+  EXPECT_EQ(ts, to_timestamp_float32(0));
+  EXPECT_EQ(ts, to_timestamp_float64(0));
+
+  ts = StringToTimestamp("1970-01-01 00:00:01");
+  EXPECT_EQ(ts, to_timestamp_int32(1));
+  EXPECT_EQ(ts, to_timestamp_int64(1));
+  EXPECT_EQ(ts, to_timestamp_float32(1));
+  EXPECT_EQ(ts, to_timestamp_float64(1));
+
+  ts = StringToTimestamp("1970-01-01 00:01:00");
+  EXPECT_EQ(ts, to_timestamp_int32(60));
+  EXPECT_EQ(ts, to_timestamp_int64(60));
+  EXPECT_EQ(ts, to_timestamp_float32(60));
+  EXPECT_EQ(ts, to_timestamp_float64(60));
+
+  ts = StringToTimestamp("1970-01-01 01:00:00");
+  EXPECT_EQ(ts, to_timestamp_int32(3600));
+  EXPECT_EQ(ts, to_timestamp_int64(3600));
+  EXPECT_EQ(ts, to_timestamp_float32(3600));
+  EXPECT_EQ(ts, to_timestamp_float64(3600));
+
+  ts = StringToTimestamp("1970-01-02 00:00:00");
+  EXPECT_EQ(ts, to_timestamp_int32(86400));
+  EXPECT_EQ(ts, to_timestamp_int64(86400));
+  EXPECT_EQ(ts, to_timestamp_float32(86400));
+  EXPECT_EQ(ts, to_timestamp_float64(86400));
+
+  // tests with fractional part
+  ts = StringToTimestamp("1970-01-01 00:00:01") + 500;
+  EXPECT_EQ(ts, to_timestamp_float32(1.500f));
+  EXPECT_EQ(ts, to_timestamp_float64(1.500));
+
+  ts = StringToTimestamp("1970-01-01 00:01:01") + 600;
+  EXPECT_EQ(ts, to_timestamp_float32(61.600f));
+  EXPECT_EQ(ts, to_timestamp_float64(61.600));
+
+  ts = StringToTimestamp("1970-01-01 01:00:01") + 400;
+  EXPECT_EQ(ts, to_timestamp_float32(3601.400f));
+  EXPECT_EQ(ts, to_timestamp_float64(3601.400));
+}
+
+TEST(TestTime, TestToTimeNumeric) {
+  // input timestamp in seconds: 1970-01-01 00:00:00
+  int64_t expected_output = 0;  // 0 milliseconds
+  EXPECT_EQ(expected_output, to_time_int32(0));
+  EXPECT_EQ(expected_output, to_time_int64(0));
+  EXPECT_EQ(expected_output, to_time_float32(0.000f));
+  EXPECT_EQ(expected_output, to_time_float64(0.000));
+
+  // input timestamp in seconds: 1970-01-01 00:00:01
+  expected_output = 1000;  // 1 seconds
+  EXPECT_EQ(expected_output, to_time_int32(1));
+  EXPECT_EQ(expected_output, to_time_int64(1));
+  EXPECT_EQ(expected_output, to_time_float32(1.000f));
+  EXPECT_EQ(expected_output, to_time_float64(1.000));
+
+  // input timestamp in seconds: 1970-01-01 01:00:00
+  expected_output = 3600000;  // 3600 seconds
+  EXPECT_EQ(expected_output, to_time_int32(3600));
+  EXPECT_EQ(expected_output, to_time_int64(3600));
+  EXPECT_EQ(expected_output, to_time_float32(3600.000f));
+  EXPECT_EQ(expected_output, to_time_float64(3600.000));
+
+  // input timestamp in seconds: 1970-01-01 23:59:59
+  expected_output = 86399000;  // 86399 seconds
+  EXPECT_EQ(expected_output, to_time_int32(86399));
+  EXPECT_EQ(expected_output, to_time_int64(86399));
+  EXPECT_EQ(expected_output, to_time_float32(86399.000f));
+  EXPECT_EQ(expected_output, to_time_float64(86399.000));
+
+  // input timestamp in seconds: 2020-01-01 00:00:01
+  expected_output = 1000;  // 1 second
+  EXPECT_EQ(expected_output, to_time_int64(1577836801));
+  EXPECT_EQ(expected_output, to_time_float64(1577836801.000));
+
+  // tests with fractional part
+  // input timestamp in seconds: 1970-01-01 00:00:01.500
+  expected_output = 1500;  // 1.5 seconds
+  EXPECT_EQ(expected_output, to_time_float32(1.500f));
+  EXPECT_EQ(expected_output, to_time_float64(1.500));
+
+  // input timestamp in seconds: 1970-01-01 00:01:01.500
+  expected_output = 61500;  // 61.5 seconds
+  EXPECT_EQ(expected_output, to_time_float32(61.500f));
+  EXPECT_EQ(expected_output, to_time_float64(61.500));
+
+  // input timestamp in seconds: 1970-01-01 01:00:01.500
+  expected_output = 3601500;  // 3601.5 seconds
+  EXPECT_EQ(expected_output, to_time_float32(3601.500f));
+  EXPECT_EQ(expected_output, to_time_float64(3601.500));
+}
+
+TEST(TestTime, TestCastIntDayInterval) {
+  EXPECT_EQ(castBIGINT_daytimeinterval(10), 864000000);
+  EXPECT_EQ(castBIGINT_daytimeinterval(-100), -8640000001);
+  EXPECT_EQ(castBIGINT_daytimeinterval(-0), 0);
+}
+
+TEST(TestTime, TestCastIntYearInterval) {
+  EXPECT_EQ(castINT_year_interval(24), 2);
+  EXPECT_EQ(castINT_year_interval(-24), -2);
+  EXPECT_EQ(castINT_year_interval(-23), -1);
+
+  EXPECT_EQ(castBIGINT_year_interval(24), 2);
+  EXPECT_EQ(castBIGINT_year_interval(-24), -2);
+  EXPECT_EQ(castBIGINT_year_interval(-23), -1);
+}
+
+TEST(TestTime, TestCastNullableInterval) {
+  ExecutionContext context;
+  auto context_ptr = reinterpret_cast<int64_t>(&context);
+  // Test castNULLABLEINTERVALDAY for int and bigint
+  EXPECT_EQ(castNULLABLEINTERVALDAY_int32(1), 1);
+  EXPECT_EQ(castNULLABLEINTERVALDAY_int32(12), 12);
+  EXPECT_EQ(castNULLABLEINTERVALDAY_int32(-55), -55);
+  EXPECT_EQ(castNULLABLEINTERVALDAY_int32(-1201), -1201);
+  EXPECT_EQ(castNULLABLEINTERVALDAY_int64(1), 1);
+  EXPECT_EQ(castNULLABLEINTERVALDAY_int64(12), 12);
+  EXPECT_EQ(castNULLABLEINTERVALDAY_int64(-55), -55);
+  EXPECT_EQ(castNULLABLEINTERVALDAY_int64(-1201), -1201);
+
+  // Test castNULLABLEINTERVALYEAR for int and bigint
+  EXPECT_EQ(castNULLABLEINTERVALYEAR_int32(context_ptr, 1), 1);
+  EXPECT_EQ(castNULLABLEINTERVALYEAR_int32(context_ptr, 12), 12);
+  EXPECT_EQ(castNULLABLEINTERVALYEAR_int32(context_ptr, 55), 55);
+  EXPECT_EQ(castNULLABLEINTERVALYEAR_int32(context_ptr, 1201), 1201);
+  EXPECT_EQ(castNULLABLEINTERVALYEAR_int64(context_ptr, 1), 1);
+  EXPECT_EQ(castNULLABLEINTERVALYEAR_int64(context_ptr, 12), 12);
+  EXPECT_EQ(castNULLABLEINTERVALYEAR_int64(context_ptr, 55), 55);
+  EXPECT_EQ(castNULLABLEINTERVALYEAR_int64(context_ptr, 1201), 1201);
+  // validate overflow error when using bigint as input
+  castNULLABLEINTERVALYEAR_int64(context_ptr, INT64_MAX);
+  EXPECT_EQ(context.get_error(), "Integer overflow");
+  context.Reset();
 }
 
 }  // namespace gandiva

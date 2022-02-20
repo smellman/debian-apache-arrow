@@ -63,6 +63,7 @@ set(SRC_FILES
     decimal_xlarge.cc
     engine.cc
     date_utils.cc
+    encrypt_utils.cc
     expr_decomposer.cc
     expr_validator.cc
     expression.cc
@@ -79,6 +80,7 @@ set(SRC_FILES
     function_registry_timestamp_arithmetic.cc
     function_signature.cc
     gdv_function_stubs.cc
+    gandiva_object_cache.cc
     hash_utils.cc
     llvm_generator.cc
     llvm_types.cc
@@ -86,6 +88,7 @@ set(SRC_FILES
     literal_holder.cc
     projector.cc
     regex_util.cc
+    replace_holder.cc
     selection_vector.cc
     tree_expr_builder.cc
     to_date_holder.cc
@@ -97,8 +100,8 @@ set(GANDIVA_SHARED_PRIVATE_LINK_LIBS arrow_shared LLVM::LLVM_INTERFACE
 
 set(GANDIVA_STATIC_LINK_LIBS arrow_static LLVM::LLVM_INTERFACE ${GANDIVA_OPENSSL_LIBS})
 
-if(ARROW_GANDIVA_STATIC_LIBSTDCPP
-   AND (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX))
+if(ARROW_GANDIVA_STATIC_LIBSTDCPP AND (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX
+                                      ))
   set(GANDIVA_STATIC_LINK_LIBS ${GANDIVA_STATIC_LINK_LIBS} -static-libstdc++
                                -static-libgcc)
 endif()
@@ -111,10 +114,7 @@ endif()
 #     set(GANDIVA_SHARED_LINK_FLAGS "${GANDIVA_SHARED_LINK_FLAGS} /EXPORT:${SYMBOL}")
 #   endforeach()
 # endif()
-if(NOT APPLE AND NOT MSVC_TOOLCHAIN)
-  # Localize thirdparty symbols using a linker version script. This hides them
-  # from the client application. The OS X linker does not support the
-  # version-script option.
+if(CXX_LINKER_SUPPORTS_VERSION_SCRIPT)
   set(GANDIVA_VERSION_SCRIPT_FLAGS
       "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/symbols.map")
   set(GANDIVA_SHARED_LINK_FLAGS
@@ -138,6 +138,7 @@ add_arrow_lib(gandiva
               EXTRA_INCLUDES
               $<TARGET_PROPERTY:LLVM::LLVM_INTERFACE,INTERFACE_INCLUDE_DIRECTORIES>
               ${GANDIVA_OPENSSL_INCLUDE_DIR}
+              ${UTF8PROC_INCLUDE_DIR}
               SHARED_LINK_FLAGS
               ${GANDIVA_SHARED_LINK_FLAGS}
               SHARED_LINK_LIBS
@@ -209,8 +210,11 @@ endfunction()
 
 set(GANDIVA_INTERNALS_TEST_ARGUMENTS)
 if(WIN32)
-  list(APPEND GANDIVA_INTERNALS_TEST_ARGUMENTS EXTRA_LINK_LIBS LLVM::LLVM_INTERFACE
-              ${GANDIVA_OPENSSL_LIBS})
+  list(APPEND
+       GANDIVA_INTERNALS_TEST_ARGUMENTS
+       EXTRA_LINK_LIBS
+       LLVM::LLVM_INTERFACE
+       ${GANDIVA_OPENSSL_LIBS})
 endif()
 add_gandiva_test(internals-test
                  SOURCES
@@ -222,6 +226,7 @@ add_gandiva_test(internals-test
                  llvm_generator_test.cc
                  annotator_test.cc
                  tree_expr_test.cc
+                 encrypt_utils_test.cc
                  expr_decomposer_test.cc
                  expression_registry_test.cc
                  selection_vector_test.cc
@@ -229,6 +234,7 @@ add_gandiva_test(internals-test
                  to_date_holder_test.cc
                  simple_arena_test.cc
                  like_holder_test.cc
+                 replace_holder_test.cc
                  decimal_type_util_test.cc
                  random_generator_holder_test.cc
                  hash_utils_test.cc
@@ -239,7 +245,8 @@ add_gandiva_test(internals-test
                  EXTRA_INCLUDES
                  $<TARGET_PROPERTY:LLVM::LLVM_INTERFACE,INTERFACE_INCLUDE_DIRECTORIES>
                  ${GANDIVA_INTERNALS_TEST_ARGUMENTS}
-                 ${GANDIVA_OPENSSL_INCLUDE_DIR})
+                 ${GANDIVA_OPENSSL_INCLUDE_DIR}
+                 ${UTF8PROC_INCLUDE_DIR})
 
 if(ARROW_GANDIVA_JAVA)
   add_subdirectory(jni)

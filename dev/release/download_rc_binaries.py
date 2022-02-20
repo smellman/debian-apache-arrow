@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -15,36 +14,48 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
 import re
 
 import argparse
 import concurrent.futures as cf
 import functools
-import hashlib
-import json
 import os
 import subprocess
 import urllib.request
 
 
-BINTRAY_API_ROOT = "https://bintray.com/api/v1"
-BINTRAY_DL_ROOT = "https://dl.bintray.com"
-BINTRAY_REPO = os.getenv('BINTRAY_REPOSITORY', 'apache/arrow')
 DEFAULT_PARALLEL_DOWNLOADS = 8
 
 
-class Bintray:
+class Downloader:
 
-    def __init__(self, repo=BINTRAY_REPO):
-        self.repo = repo
-
-    def get_file_list(self, package, version):
-        url = os.path.join(BINTRAY_API_ROOT, 'packages', self.repo, package,
-                           'versions', version, 'files')
-        request = urllib.request.urlopen(url).read()
-        return json.loads(request)
+    def get_file_list(self, prefix, filter=None):
+        def traverse(directory, files, directories):
+            url = f'{self.URL_ROOT}/{directory}'
+            response = urllib.request.urlopen(url).read().decode()
+            paths = re.findall('<a href="(.+?)"', response)
+            for path in paths:
+                path = re.sub(f'^{re.escape(url)}',
+                              '',
+                              path)
+                if path == '../':
+                    continue
+                resolved_path = f'{directory}{path}'
+                if filter and not filter(path):
+                    continue
+                if path.endswith('/'):
+                    directories.append(resolved_path)
+                else:
+                    files.append(resolved_path)
+        files = []
+        if prefix != '' and not prefix.endswith('/'):
+            prefix += '/'
+        directories = [prefix]
+        while len(directories) > 0:
+            directory = directories.pop()
+            traverse(directory, files, directories)
+        return files
 
     def download_files(self, files, dest=None, num_parallel=None,
                        re_match=None):
@@ -69,7 +80,7 @@ class Bintray:
 
         if re_match is not None:
             regex = re.compile(re_match)
-            files = [x for x in files if regex.match(x['path'])]
+            files = [x for x in files if regex.match(x)]
 
         if num_parallel == 1:
             for path in files:
@@ -81,40 +92,37 @@ class Bintray:
                 num_parallel
             )
 
-    def _download_file(self, dest, info):
-        relpath = info['path']
-
-        base, filename = os.path.split(relpath)
+    def _download_file(self, dest, path):
+        base, filename = os.path.split(path)
 
         dest_dir = os.path.join(dest, base)
         os.makedirs(dest_dir, exist_ok=True)
 
         dest_path = os.path.join(dest_dir, filename)
 
-        if os.path.exists(dest_path):
-            with open(dest_path, 'rb') as f:
-                sha256sum = hashlib.sha256(f.read()).hexdigest()
-            if sha256sum == info['sha256']:
-                print('Local file {} sha256 matches, skipping'
-                      .format(dest_path))
-                return
-            else:
-                print('Local file sha256 does not match, overwriting')
+        print("Downloading {} to {}".format(path, dest_path))
 
-        print("Downloading {} to {}".format(relpath, dest_path))
-
-        bintray_abspath = os.path.join(BINTRAY_DL_ROOT, self.repo, relpath)
+        url = f'{self.URL_ROOT}/{path}'
 
         cmd = [
             'curl', '--fail', '--location', '--retry', '5',
-            '--output', dest_path, bintray_abspath
+            '--output', dest_path, url
         ]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
         stdout, stderr = proc.communicate()
         if proc.returncode != 0:
             raise Exception("Downloading {} failed\nstdout: {}\nstderr: {}"
-                            .format(relpath, stdout, stderr))
+                            .format(path, stdout, stderr))
+
+
+class Artifactory(Downloader):
+    URL_ROOT = "https://apache.jfrog.io/artifactory/arrow"
+
+
+class Maven(Downloader):
+    URL_ROOT = "https://repository.apache.org" + \
+        "/content/repositories/staging/org/apache/arrow"
 
 
 def parallel_map_terminate_early(f, iterable, num_parallel):
@@ -131,23 +139,48 @@ def parallel_map_terminate_early(f, iterable, num_parallel):
                 raise e
 
 
-ARROW_PACKAGE_TYPES = ['centos', 'debian', 'nuget', 'python', 'ubuntu']
+ARROW_REPOSITORY_PACKAGE_TYPES = [
+    'almalinux',
+    'amazon-linux',
+    'centos',
+    'debian',
+    'ubuntu',
+]
+ARROW_STANDALONE_PACKAGE_TYPES = ['nuget', 'python']
+ARROW_PACKAGE_TYPES = \
+    ARROW_REPOSITORY_PACKAGE_TYPES + \
+    ARROW_STANDALONE_PACKAGE_TYPES
 
 
 def download_rc_binaries(version, rc_number, re_match=None, dest=None,
                          num_parallel=None, target_package_type=None):
-    bintray = Bintray()
-
     version_string = '{}-rc{}'.format(version, rc_number)
+    version_pattern = re.compile(r'\d+\.\d+\.\d+')
     if target_package_type:
         package_types = [target_package_type]
     else:
         package_types = ARROW_PACKAGE_TYPES
     for package_type in package_types:
-        files = bintray.get_file_list('{}-rc'.format(package_type),
-                                      version_string)
-        bintray.download_files(files, re_match=re_match, dest=dest,
-                               num_parallel=num_parallel)
+        def is_target(path):
+            match = version_pattern.search(path)
+            if not match:
+                return True
+            return match[0] == version
+        filter = is_target
+
+        if package_type == 'jars':
+            downloader = Maven()
+            prefix = ''
+        elif package_type in ARROW_REPOSITORY_PACKAGE_TYPES:
+            downloader = Artifactory()
+            prefix = f'{package_type}-rc'
+        else:
+            downloader = Artifactory()
+            prefix = f'{package_type}-rc/{version_string}'
+            filter = None
+        files = downloader.get_file_list(prefix, filter=filter)
+        downloader.download_files(files, re_match=re_match, dest=dest,
+                                  num_parallel=num_parallel)
 
 
 if __name__ == '__main__':

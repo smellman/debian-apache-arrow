@@ -1,5 +1,11 @@
-apache-arrow-apt-source (4.0.0-1) unstable; urgency=low
+apache-arrow-apt-source (7.0.0-1) unstable; urgency=low
 
   * New upstream release.
 
- -- Krisztián Szűcs <szucs.krisztian@gmail.com>  Wed, 21 Apr 2021 16:11:33 -0000
+ -- Krisztián Szűcs <szucs.krisztian@gmail.com>  Sat, 29 Jan 2022 00:07:53 -0000
+
+apache-arrow-apt-source (6.0.0-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Krisztián Szűcs <szucs.krisztian@gmail.com>  Thu, 21 Oct 2021 19:01:54 -0000

@@ -16,6 +16,7 @@
 // under the License.
 
 #include <memory>
+#include <numeric>
 #include <sstream>
 #include <utility>
 
@@ -195,8 +196,11 @@ class MinioFixture : public benchmark::Fixture {
 /// (GBenchmark doesn't run GTest environments.)
 class S3BenchmarkEnvironment {
  public:
-  S3BenchmarkEnvironment() { s3_env->SetUp(); }
-  ~S3BenchmarkEnvironment() { s3_env->TearDown(); }
+  S3BenchmarkEnvironment() { s3_env_.SetUp(); }
+  ~S3BenchmarkEnvironment() { s3_env_.TearDown(); }
+
+ private:
+  S3Environment s3_env_;
 };
 
 S3BenchmarkEnvironment env{};
@@ -260,8 +264,10 @@ static void CoalescedRead(benchmark::State& st, S3FileSystem* fs,
     ASSERT_OK_AND_ASSIGN(size, file->GetSize());
     total_items += 1;
 
-    io::internal::ReadRangeCache cache(file, {},
-                                       io::CacheOptions{8192, 64 * 1024 * 1024});
+    io::internal::ReadRangeCache cache(
+        file, {},
+        io::CacheOptions{/*hole_size_limit=*/8192, /*range_size_limit=*/64 * 1024 * 1024,
+                         /*lazy=*/false});
     std::vector<io::ReadRange> ranges;
 
     int64_t offset = 0;

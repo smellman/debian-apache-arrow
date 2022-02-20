@@ -14,24 +14,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package arrjson // import "github.com/apache/arrow/go/arrow/internal/arrjson"
+package arrjson
 
 import (
 	"encoding/json"
 	"io"
 	"sync/atomic"
 
-	"github.com/apache/arrow/go/arrow"
-	"github.com/apache/arrow/go/arrow/array"
-	"github.com/apache/arrow/go/arrow/arrio"
-	"github.com/apache/arrow/go/arrow/internal/debug"
+	"github.com/apache/arrow/go/v7/arrow"
+	"github.com/apache/arrow/go/v7/arrow/arrio"
+	"github.com/apache/arrow/go/v7/arrow/internal/debug"
 )
 
 type Reader struct {
 	refs int64
 
 	schema *arrow.Schema
-	recs   []array.Record
+	recs   []arrow.Record
 
 	irec int // current record index. used for the arrio.Reader interface.
 }
@@ -39,10 +38,7 @@ type Reader struct {
 func NewReader(r io.Reader, opts ...Option) (*Reader, error) {
 	dec := json.NewDecoder(r)
 	dec.UseNumber()
-	var raw struct {
-		Schema  Schema   `json:"schema"`
-		Records []Record `json:"batches"`
-	}
+	var raw rawJSON
 	err := dec.Decode(&raw)
 	if err != nil {
 		return nil, err
@@ -86,7 +82,7 @@ func (r *Reader) Release() {
 func (r *Reader) Schema() *arrow.Schema { return r.schema }
 func (r *Reader) NumRecords() int       { return len(r.recs) }
 
-func (r *Reader) Read() (array.Record, error) {
+func (r *Reader) Read() (arrow.Record, error) {
 	if r.irec == r.NumRecords() {
 		return nil, io.EOF
 	}

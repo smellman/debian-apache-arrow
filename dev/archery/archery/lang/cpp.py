@@ -42,7 +42,7 @@ class CppConfiguration:
                  cc=None, cxx=None, cxx_flags=None,
                  build_type=None, warn_level=None,
                  cpp_package_prefix=None, install_prefix=None, use_conda=None,
-                 build_static=False, build_shared=True,
+                 build_static=False, build_shared=True, build_unity=True,
                  # tests & examples
                  with_tests=None, with_benchmarks=None, with_examples=None,
                  with_integration=None,
@@ -63,7 +63,7 @@ class CppConfiguration:
                  # extras
                  with_lint_only=False,
                  use_gold_linker=True,
-                 simd_level="SSE4_2",
+                 simd_level="DEFAULT",
                  cmake_extras=None):
         self._cc = cc
         self._cxx = cxx
@@ -76,6 +76,7 @@ class CppConfiguration:
         self._use_conda = use_conda
         self.build_static = build_static
         self.build_shared = build_shared
+        self.build_unity = build_unity
 
         self.with_tests = with_tests
         self.with_benchmarks = with_benchmarks
@@ -176,7 +177,6 @@ class CppConfiguration:
 
         yield ("CMAKE_EXPORT_COMPILE_COMMANDS", truthifier(True))
         yield ("CMAKE_BUILD_TYPE", self.build_type)
-        yield ("CMAKE_UNITY_BUILD", True)
 
         if not self.with_lint_only:
             yield ("BUILD_WARNING_LEVEL",
@@ -195,6 +195,7 @@ class CppConfiguration:
 
         yield ("ARROW_BUILD_STATIC", truthifier(self.build_static))
         yield ("ARROW_BUILD_SHARED", truthifier(self.build_shared))
+        yield ("CMAKE_UNITY_BUILD", truthifier(self.build_unity))
 
         # Tests and benchmarks
         yield ("ARROW_BUILD_TESTS", truthifier(self.with_tests))
@@ -241,7 +242,7 @@ class CppConfiguration:
         broken_with_gold_ld = [self.with_fuzzing, self.with_gandiva]
         if self.use_gold_linker and not any(broken_with_gold_ld):
             yield ("ARROW_USE_LD_GOLD", truthifier(self.use_gold_linker))
-        yield ("ARROW_SIMD_LEVEL", or_else(self.simd_level, "SSE4_2"))
+        yield ("ARROW_SIMD_LEVEL", or_else(self.simd_level, "DEFAULT"))
 
         # Detect custom conda toolchain
         if self.use_conda:

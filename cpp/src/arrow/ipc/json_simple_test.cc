@@ -34,7 +34,10 @@
 #include "arrow/array/builder_nested.h"
 #include "arrow/array/builder_primitive.h"
 #include "arrow/array/builder_time.h"
+#include "arrow/chunked_array.h"
 #include "arrow/ipc/json_simple.h"
+#include "arrow/scalar.h"
+#include "arrow/testing/builder.h"
 #include "arrow/testing/gtest_util.h"
 #include "arrow/type.h"
 #include "arrow/type_traits.h"
@@ -134,6 +137,21 @@ void AssertJSONDictArray(const std::shared_ptr<DataType>& index_type,
   const auto& dict_array = checked_cast<const DictionaryArray&>(*actual);
   AssertArraysEqual(*expected_indices, *dict_array.indices());
   AssertArraysEqual(*expected_values, *dict_array.dictionary());
+}
+
+template <typename T, typename C_TYPE = typename T::c_type>
+void AssertJSONScalar(const std::shared_ptr<DataType>& type, const std::string& json,
+                      const bool is_valid, const C_TYPE value) {
+  SCOPED_TRACE(json);
+  std::shared_ptr<Scalar> actual, expected;
+
+  ASSERT_OK(ScalarFromJSON(type, json, &actual));
+  if (is_valid) {
+    ASSERT_OK_AND_ASSIGN(expected, MakeScalar(type, value));
+  } else {
+    expected = MakeNullScalar(type);
+  }
+  AssertScalarsEqual(*expected, *actual, /*verbose=*/true);
 }
 
 TEST(TestHelper, JSONArray) {
@@ -329,7 +347,6 @@ TEST(TestNull, Errors) {
 
 TEST(TestBoolean, Basics) {
   std::shared_ptr<DataType> type = boolean();
-  std::shared_ptr<Array> expected, actual;
 
   AssertJSONArray<BooleanType, bool>(type, "[]", {});
   AssertJSONArray<BooleanType, bool>(type, "[false, true, false]", {false, true, false});
@@ -459,6 +476,12 @@ TEST(TestDayTimeInterval, Basics) {
   auto type = day_time_interval();
   AssertJSONArray<DayTimeIntervalType>(type, R"([[1, -600], null])", {true, false},
                                        {{1, -600}, {}});
+}
+
+TEST(MonthDayNanoInterval, Basics) {
+  auto type = month_day_nano_interval();
+  AssertJSONArray<MonthDayNanoIntervalType>(type, R"([[1, -600, 5000], null])",
+                                            {true, false}, {{1, -600, 5000}, {}});
 }
 
 TEST(TestFixedSizeBinary, Basics) {
@@ -1325,6 +1348,86 @@ TEST(TestDictArrayFromJSON, Errors) {
                 DictArrayFromJSON(type, "[\"not a valid index\"]", "[\"\"]", &array));
   ASSERT_RAISES(Invalid, DictArrayFromJSON(type, "[0, 1]", "[1]",
                                            &array));  // dict value isn't string
+}
+
+TEST(TestChunkedArrayFromJSON, Basics) {
+  auto type = int32();
+  std::shared_ptr<ChunkedArray> chunked_array;
+  ASSERT_OK(ChunkedArrayFromJSON(type, {}, &chunked_array));
+  ASSERT_OK(chunked_array->ValidateFull());
+  ASSERT_EQ(chunked_array->num_chunks(), 0);
+  AssertTypeEqual(type, chunked_array->type());
+
+  ASSERT_OK(ChunkedArrayFromJSON(type, {"[1, 2]", "[3, null, 4]"}, &chunked_array));
+  ASSERT_OK(chunked_array->ValidateFull());
+  ASSERT_EQ(chunked_array->num_chunks(), 2);
+  std::shared_ptr<Array> expected_chunk;
+  ASSERT_OK(ArrayFromJSON(type, "[1, 2]", &expected_chunk));
+  AssertArraysEqual(*expected_chunk, *chunked_array->chunk(0), /*verbose=*/true);
+  ASSERT_OK(ArrayFromJSON(type, "[3, null, 4]", &expected_chunk));
+  AssertArraysEqual(*expected_chunk, *chunked_array->chunk(1), /*verbose=*/true);
+}
+
+TEST(TestScalarFromJSON, Basics) {
+  // Sanity check for common types (not exhaustive)
+  std::shared_ptr<Scalar> scalar;
+  AssertJSONScalar<Int64Type>(int64(), "4", true, 4);
+  AssertJSONScalar<Int64Type>(int64(), "null", false, 0);
+  AssertJSONScalar<StringType, std::shared_ptr<Buffer>>(utf8(), R"("")", true,
+                                                        Buffer::FromString(""));
+  AssertJSONScalar<StringType, std::shared_ptr<Buffer>>(utf8(), R"("foo")", true,
+                                                        Buffer::FromString("foo"));
+  AssertJSONScalar<StringType, std::shared_ptr<Buffer>>(utf8(), R"(null)", false,
+                                                        Buffer::FromString(""));
+  AssertJSONScalar<NullType, std::nullptr_t>(null(), "null", false, nullptr);
+  AssertJSONScalar<BooleanType, bool>(boolean(), "true", true, true);
+  AssertJSONScalar<BooleanType, bool>(boolean(), "false", true, false);
+  AssertJSONScalar<BooleanType, bool>(boolean(), "null", false, false);
+  AssertJSONScalar<BooleanType, bool>(boolean(), "0", true, false);
+  AssertJSONScalar<BooleanType, bool>(boolean(), "1", true, true);
+  AssertJSONScalar<DoubleType>(float64(), "1.0", true, 1.0);
+  AssertJSONScalar<DoubleType>(float64(), "-0.0", true, -0.0);
+  ASSERT_OK(ScalarFromJSON(float64(), "NaN", &scalar));
+  ASSERT_TRUE(std::isnan(checked_cast<DoubleScalar&>(*scalar).value));
+  ASSERT_OK(ScalarFromJSON(float64(), "Inf", &scalar));
+  ASSERT_TRUE(std::isinf(checked_cast<DoubleScalar&>(*scalar).value));
+}
+
+TEST(TestScalarFromJSON, Errors) {
+  std::shared_ptr<Scalar> scalar;
+  ASSERT_RAISES(Invalid, ScalarFromJSON(int64(), "[0]", &scalar));
+  ASSERT_RAISES(Invalid, ScalarFromJSON(int64(), "[9223372036854775808]", &scalar));
+  ASSERT_RAISES(Invalid, ScalarFromJSON(int64(), "[-9223372036854775809]", &scalar));
+  ASSERT_RAISES(Invalid, ScalarFromJSON(uint64(), "[18446744073709551616]", &scalar));
+  ASSERT_RAISES(Invalid, ScalarFromJSON(uint64(), "[-1]", &scalar));
+  ASSERT_RAISES(Invalid, ScalarFromJSON(binary(), "0", &scalar));
+  ASSERT_RAISES(Invalid, ScalarFromJSON(binary(), "[]", &scalar));
+  ASSERT_RAISES(Invalid, ScalarFromJSON(boolean(), "0.0", &scalar));
+  ASSERT_RAISES(Invalid, ScalarFromJSON(boolean(), "\"true\"", &scalar));
+}
+
+TEST(TestDictScalarFromJSON, Basics) {
+  auto type = dictionary(int32(), utf8());
+  auto dict = R"(["whiskey", "tango", "foxtrot"])";
+  auto expected_dictionary = ArrayFromJSON(utf8(), dict);
+
+  for (auto index : {"null", "2", "1", "0"}) {
+    auto scalar = DictScalarFromJSON(type, index, dict);
+    auto expected_index = ScalarFromJSON(int32(), index);
+    AssertScalarsEqual(*DictionaryScalar::Make(expected_index, expected_dictionary),
+                       *scalar, /*verbose=*/true);
+    ASSERT_OK(scalar->ValidateFull());
+  }
+}
+
+TEST(TestDictScalarFromJSON, Errors) {
+  auto type = dictionary(int32(), utf8());
+  std::shared_ptr<Scalar> scalar;
+
+  ASSERT_RAISES(Invalid,
+                DictScalarFromJSON(type, "\"not a valid index\"", "[\"\"]", &scalar));
+  ASSERT_RAISES(Invalid, DictScalarFromJSON(type, "0", "[1]",
+                                            &scalar));  // dict value isn't string
 }
 
 }  // namespace json

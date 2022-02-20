@@ -45,7 +45,7 @@
 #include "arrow/util/logging.h"
 #include "arrow/util/string_view.h"
 #include "arrow/util/ubsan.h"
-#include "arrow/visitor_inline.h"
+
 #include "parquet/arrow/reader.h"
 #include "parquet/arrow/schema.h"
 #include "parquet/arrow/schema_internal.h"
@@ -55,8 +55,7 @@
 #include "parquet/schema.h"
 #include "parquet/statistics.h"
 #include "parquet/types.h"
-// Required after "arrow/util/int_util_internal.h" (for OPTIONAL)
-#include "parquet/windows_compatibility.h"
+#include "parquet/windows_fixup.h"  // for OPTIONAL
 
 using arrow::Array;
 using arrow::BooleanArray;
@@ -79,7 +78,7 @@ using arrow::StructArray;
 using arrow::Table;
 using arrow::TimestampArray;
 
-using ::arrow::BitUtil::FromBigEndian;
+using ::arrow::bit_util::FromBigEndian;
 using ::arrow::internal::checked_cast;
 using ::arrow::internal::checked_pointer_cast;
 using ::arrow::internal::SafeLeftShift;
@@ -93,7 +92,7 @@ using parquet::schema::Node;
 using parquet::schema::PrimitiveNode;
 using ParquetType = parquet::Type;
 
-namespace BitUtil = arrow::BitUtil;
+namespace bit_util = arrow::bit_util;
 
 namespace parquet {
 namespace arrow {
@@ -333,7 +332,7 @@ std::shared_ptr<Array> TransferZeroCopy(RecordReader* reader,
 Status TransferBool(RecordReader* reader, MemoryPool* pool, Datum* out) {
   int64_t length = reader->values_written();
 
-  const int64_t buffer_size = BitUtil::BytesForBits(length);
+  const int64_t buffer_size = bit_util::BytesForBits(length);
   ARROW_ASSIGN_OR_RAISE(auto data, ::arrow::AllocateBuffer(buffer_size, pool));
 
   // Transfer boolean values to packed bitmap
@@ -343,7 +342,7 @@ Status TransferBool(RecordReader* reader, MemoryPool* pool, Datum* out) {
 
   for (int64_t i = 0; i < length; i++) {
     if (values[i]) {
-      ::arrow::BitUtil::SetBit(data_ptr, i);
+      ::arrow::bit_util::SetBit(data_ptr, i);
     }
   }
 
@@ -353,7 +352,8 @@ Status TransferBool(RecordReader* reader, MemoryPool* pool, Datum* out) {
 }
 
 Status TransferInt96(RecordReader* reader, MemoryPool* pool,
-                     const std::shared_ptr<DataType>& type, Datum* out) {
+                     const std::shared_ptr<DataType>& type, Datum* out,
+                     const ::arrow::TimeUnit::type int96_arrow_time_unit) {
   int64_t length = reader->values_written();
   auto values = reinterpret_cast<const Int96*>(reader->values());
   ARROW_ASSIGN_OR_RAISE(auto data,
@@ -365,7 +365,20 @@ Status TransferInt96(RecordReader* reader, MemoryPool* pool,
       // isn't representable as a 64-bit Unix timestamp.
       *data_ptr++ = 0;
     } else {
-      *data_ptr++ = Int96GetNanoSeconds(values[i]);
+      switch (int96_arrow_time_unit) {
+        case ::arrow::TimeUnit::NANO:
+          *data_ptr++ = Int96GetNanoSeconds(values[i]);
+          break;
+        case ::arrow::TimeUnit::MICRO:
+          *data_ptr++ = Int96GetMicroSeconds(values[i]);
+          break;
+        case ::arrow::TimeUnit::MILLI:
+          *data_ptr++ = Int96GetMilliSeconds(values[i]);
+          break;
+        case ::arrow::TimeUnit::SECOND:
+          *data_ptr++ = Int96GetSeconds(values[i]);
+          break;
+      }
     }
   }
   *out = std::make_shared<TimestampArray>(type, length, std::move(data),
@@ -415,7 +428,7 @@ Status TransferBinary(RecordReader* reader, MemoryPool* pool,
   }
   ::arrow::compute::ExecContext ctx(pool);
   ::arrow::compute::CastOptions cast_options;
-  cast_options.allow_invalid_utf8 = false;  // avoid spending time validating UTF8 data
+  cast_options.allow_invalid_utf8 = true;  // avoid spending time validating UTF8 data
 
   auto binary_reader = dynamic_cast<BinaryRecordReader*>(reader);
   DCHECK(binary_reader);
@@ -599,7 +612,7 @@ static Status DecimalIntegerTransfer(RecordReader* reader, MemoryPool* pool,
   ARROW_ASSIGN_OR_RAISE(auto data, ::arrow::AllocateBuffer(length * type_length, pool));
   uint8_t* out_ptr = data->mutable_data();
 
-  using ::arrow::BitUtil::FromLittleEndian;
+  using ::arrow::bit_util::FromLittleEndian;
 
   for (int64_t i = 0; i < length; ++i, out_ptr += type_length) {
     // sign/zero extend int32_t values, otherwise a no-op
@@ -742,20 +755,19 @@ Status TransferColumnData(RecordReader* reader, std::shared_ptr<DataType> value_
     case ::arrow::Type::TIMESTAMP: {
       const ::arrow::TimestampType& timestamp_type =
           checked_cast<::arrow::TimestampType&>(*value_type);
-      switch (timestamp_type.unit()) {
-        case ::arrow::TimeUnit::MILLI:
-        case ::arrow::TimeUnit::MICRO: {
-          result = TransferZeroCopy(reader, value_type);
-        } break;
-        case ::arrow::TimeUnit::NANO: {
-          if (descr->physical_type() == ::parquet::Type::INT96) {
-            RETURN_NOT_OK(TransferInt96(reader, pool, value_type, &result));
-          } else {
+      if (descr->physical_type() == ::parquet::Type::INT96) {
+        RETURN_NOT_OK(
+            TransferInt96(reader, pool, value_type, &result, timestamp_type.unit()));
+      } else {
+        switch (timestamp_type.unit()) {
+          case ::arrow::TimeUnit::MILLI:
+          case ::arrow::TimeUnit::MICRO:
+          case ::arrow::TimeUnit::NANO:
             result = TransferZeroCopy(reader, value_type);
-          }
-        } break;
-        default:
-          return Status::NotImplemented("TimeUnit not supported");
+            break;
+          default:
+            return Status::NotImplemented("TimeUnit not supported");
+        }
       }
     } break;
     default:

@@ -57,7 +57,8 @@ struct IpcPayload {
   MessageType type = MessageType::NONE;
   std::shared_ptr<Buffer> metadata;
   std::vector<std::shared_ptr<Buffer>> body_buffers;
-  int64_t body_length = 0;
+  int64_t body_length = 0;      // serialized body length (padded, maybe compressed)
+  int64_t raw_body_length = 0;  // initial uncompressed body length
 };
 
 struct WriteStats {
@@ -75,6 +76,12 @@ struct WriteStats {
   /// Number of replaced dictionaries (i.e. where a dictionary batch replaces
   /// an existing dictionary with an unrelated new dictionary).
   int64_t num_replaced_dictionaries = 0;
+
+  /// Total size in bytes of record batches emitted.
+  /// The "raw" size counts the original buffer sizes, while the "serialized" size
+  /// includes padding and (optionally) compression.
+  int64_t total_raw_body_size = 0;
+  int64_t total_serialized_body_size = 0;
 };
 
 /// \class RecordBatchWriter
@@ -167,13 +174,13 @@ Result<std::shared_ptr<RecordBatchWriter>> MakeFileWriter(
 
 /// @}
 
-ARROW_DEPRECATED("Use MakeStreamWriter")
+ARROW_DEPRECATED("Deprecated in 3.0.0. Use MakeStreamWriter")
 ARROW_EXPORT
 Result<std::shared_ptr<RecordBatchWriter>> NewStreamWriter(
     io::OutputStream* sink, const std::shared_ptr<Schema>& schema,
     const IpcWriteOptions& options = IpcWriteOptions::Defaults());
 
-ARROW_DEPRECATED("Use MakeFileWriter")
+ARROW_DEPRECATED("Deprecated in 2.0.0. Use MakeFileWriter")
 ARROW_EXPORT
 Result<std::shared_ptr<RecordBatchWriter>> NewFileWriter(
     io::OutputStream* sink, const std::shared_ptr<Schema>& schema,

@@ -20,7 +20,8 @@
 #
 
 # Headers: top level
-install(FILES adapter.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/arrow/adapters/orc")
+install(FILES adapter.h options.h
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/arrow/adapters/orc")
 
 # pkg-config support
 arrow_add_pkg_config("arrow-orc")
@@ -53,9 +54,5 @@ add_arrow_test(adapter_test
                STATIC_LINK_LIBS
                ${ORC_STATIC_TEST_LINK_LIBS})
 
-set_source_files_properties(adapter_test.cc
-                            PROPERTIES
-                            SKIP_PRECOMPILE_HEADERS
-                            ON
-                            SKIP_UNITY_BUILD_INCLUSION
-                            ON)
+set_source_files_properties(adapter_test.cc PROPERTIES SKIP_PRECOMPILE_HEADERS ON
+                                                       SKIP_UNITY_BUILD_INCLUSION ON)

@@ -25,17 +25,15 @@ on:
       - "*-github-*"
 {% endmacro %}
 
-{%- macro github_checkout_arrow() -%}
+{%- macro github_checkout_arrow(fetch_depth=1) -%}
   - name: Checkout Arrow
-    run: |
-      git clone --no-checkout {{ arrow.remote }} arrow
-      git -C arrow config core.symlinks true
-      git -C arrow fetch -t {{ arrow.remote }} {{ arrow.branch }}
-      git -C arrow checkout FETCH_HEAD
-      git -C arrow submodule update --init --recursive
-  - name: Fetch Submodules and Tags
-    shell: bash
-    run: cd arrow && ci/scripts/util_checkout.sh
+    uses: actions/checkout@v2
+    with:
+      fetch-depth: {{ fetch_depth }}
+      path: arrow
+      repository: {{ arrow.github_repo }}
+      ref: {{ arrow.head }}
+      submodules: recursive
 {% endmacro %}
 
 {%- macro github_login_dockerhub() -%}
@@ -69,7 +67,7 @@ on:
       python-version: 3.8
   - name: Setup Crossbow
     shell: bash
-    run: pip install -e arrow/dev/archery[crossbow]
+    run: pip install -e arrow/dev/archery[crossbow-upload]
   - name: Upload artifacts
     shell: bash
     run: |
@@ -80,14 +78,14 @@ on:
       --sha {{ task.branch }} \
       --tag {{ task.tag }} \
     {% if pattern is string %}
-      --pattern "{{ pattern }}"
+      "{{ pattern }}"
     {% elif pattern is iterable %}
       {% for p in pattern %}
-      --pattern "{{ p }}" {{ "\\" if not loop.last else "" }}
+      "{{ p }}" {{ "\\" if not loop.last else "" }}
       {% endfor %}
     {% endif %}
     env:
-      CROSSBOW_GITHUB_TOKEN: {{ '${{ secrets.CROSSBOW_GITHUB_TOKEN }}' }}
+      CROSSBOW_GITHUB_TOKEN: {{ '${{ secrets.CROSSBOW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}' }}
 {% endmacro %}
 
 {%- macro github_upload_gemfury(pattern) -%}
@@ -105,9 +103,8 @@ on:
 
 {%- macro azure_checkout_arrow() -%}
   - script: |
-      git clone --no-checkout {{ arrow.remote }} arrow
-      git -C arrow fetch -t {{ arrow.remote }} {{ arrow.branch }}
-      git -C arrow checkout FETCH_HEAD
+      git clone --no-checkout --branch {{ arrow.branch }} {{ arrow.remote }} arrow
+      git -C arrow checkout {{ arrow.head }}
       git -C arrow submodule update --init --recursive
     displayName: Clone arrow
 {% endmacro %}
@@ -116,7 +113,7 @@ on:
   - task: UsePythonVersion@0
     inputs:
       versionSpec: '3.8'
-  - script: pip install -e arrow/dev/archery[crossbow]
+  - script: pip install -e arrow/dev/archery[crossbow-upload]
     displayName: Install Crossbow
   - bash: |
       archery crossbow \
@@ -126,10 +123,10 @@ on:
         --sha {{ task.branch }} \
         --tag {{ task.tag }} \
       {% if pattern is string %}
-        --pattern "{{ pattern }}"
+        "{{ pattern }}"
       {% elif pattern is iterable %}
         {% for p in pattern %}
-        --pattern "{{ p }}" {{ "" if not loop.last else "" }}
+        "{{ p }}" {{ "\\" if not loop.last else "" }}
         {% endfor %}
       {% endif %}
     env:
@@ -152,9 +149,8 @@ on:
 {% endmacro %}
 
 {%- macro travis_checkout_arrow() -%}
-  - git clone --no-checkout {{ arrow.remote }} arrow
-  - git -C arrow fetch -t {{ arrow.remote }} {{ arrow.branch }}
-  - git -C arrow checkout FETCH_HEAD
+  - git clone --no-checkout --branch {{ arrow.branch }} {{ arrow.remote }} arrow
+  - git -C arrow checkout {{ arrow.head }}
   - git -C arrow submodule update --init --recursive
 {% endmacro %}
 
@@ -170,7 +166,7 @@ on:
 
 {%- macro travis_upload_releases(pattern) -%}
   - sudo -H pip3 install pygit2==1.0
-  - sudo -H pip3 install -e arrow/dev/archery[crossbow]
+  - sudo -H pip3 install -e arrow/dev/archery[crossbow-upload]
   - |
     archery crossbow \
       --queue-path $(pwd) \
@@ -179,10 +175,10 @@ on:
       --sha {{ task.branch }} \
       --tag {{ task.tag }} \
     {% if pattern is string %}
-      --pattern "{{ pattern }}"
+      "{{ pattern }}"
     {% elif pattern is iterable %}
       {% for p in pattern %}
-      --pattern "{{ p }}" {{ "\\" if not loop.last else "" }}
+      "{{ p }}" {{ "\\" if not loop.last else "" }}
       {% endfor %}
     {% endif %}
 {% endmacro %}

@@ -63,6 +63,27 @@ OPS_WITH_OVERFLOW(DivideWithOverflow, div)
 #undef OP_WITH_OVERFLOW
 #undef OPS_WITH_OVERFLOW
 
+// Define function NegateWithOverflow with the signature `bool(T u, T* out)`
+// where T is a signed integer type.  On overflow, these functions return true.
+// Otherwise, false is returned and `out` is updated with the result of the
+// operation.
+
+#define UNARY_OP_WITH_OVERFLOW(_func_name, _psnip_op, _type, _psnip_type) \
+  static inline bool _func_name(_type u, _type* out) {                    \
+    return !psnip_safe_##_psnip_type##_##_psnip_op(out, u);               \
+  }
+
+#define SIGNED_UNARY_OPS_WITH_OVERFLOW(_func_name, _psnip_op)   \
+  UNARY_OP_WITH_OVERFLOW(_func_name, _psnip_op, int8_t, int8)   \
+  UNARY_OP_WITH_OVERFLOW(_func_name, _psnip_op, int16_t, int16) \
+  UNARY_OP_WITH_OVERFLOW(_func_name, _psnip_op, int32_t, int32) \
+  UNARY_OP_WITH_OVERFLOW(_func_name, _psnip_op, int64_t, int64)
+
+SIGNED_UNARY_OPS_WITH_OVERFLOW(NegateWithOverflow, neg)
+
+#undef UNARY_OP_WITH_OVERFLOW
+#undef SIGNED_UNARY_OPS_WITH_OVERFLOW
+
 /// Signed addition with well-defined behaviour on overflow (as unsigned)
 template <typename SignedInt>
 SignedInt SafeSignedAdd(SignedInt u, SignedInt v) {
@@ -77,6 +98,13 @@ SignedInt SafeSignedSubtract(SignedInt u, SignedInt v) {
   using UnsignedInt = typename std::make_unsigned<SignedInt>::type;
   return static_cast<SignedInt>(static_cast<UnsignedInt>(u) -
                                 static_cast<UnsignedInt>(v));
+}
+
+/// Signed negation with well-defined behaviour on overflow (as unsigned)
+template <typename SignedInt>
+SignedInt SafeSignedNegate(SignedInt u) {
+  using UnsignedInt = typename std::make_unsigned<SignedInt>::type;
+  return static_cast<SignedInt>(~static_cast<UnsignedInt>(u) + 1);
 }
 
 /// Signed left shift with well-defined behaviour on negative numbers or overflow
@@ -105,18 +133,19 @@ UpcastInt(Integer v) {
 static inline Status CheckSliceParams(int64_t object_length, int64_t slice_offset,
                                       int64_t slice_length, const char* object_name) {
   if (ARROW_PREDICT_FALSE(slice_offset < 0)) {
-    return Status::Invalid("Negative ", object_name, " slice offset");
+    return Status::IndexError("Negative ", object_name, " slice offset");
   }
   if (ARROW_PREDICT_FALSE(slice_length < 0)) {
-    return Status::Invalid("Negative ", object_name, " slice length");
+    return Status::IndexError("Negative ", object_name, " slice length");
   }
   int64_t offset_plus_length;
   if (ARROW_PREDICT_FALSE(
           internal::AddWithOverflow(slice_offset, slice_length, &offset_plus_length))) {
-    return Status::Invalid(object_name, " slice would overflow");
+    return Status::IndexError(object_name, " slice would overflow");
   }
-  if (ARROW_PREDICT_FALSE(slice_offset + slice_length > object_length)) {
-    return Status::Invalid(object_name, " slice would exceed ", object_name, " length");
+  if (ARROW_PREDICT_FALSE(offset_plus_length > object_length)) {
+    return Status::IndexError(object_name, " slice would exceed ", object_name,
+                              " length");
   }
   return Status::OK();
 }

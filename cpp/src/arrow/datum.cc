@@ -28,24 +28,11 @@
 #include "arrow/record_batch.h"
 #include "arrow/scalar.h"
 #include "arrow/table.h"
+#include "arrow/util/byte_size.h"
 #include "arrow/util/logging.h"
 #include "arrow/util/memory.h"
 
 namespace arrow {
-
-static bool CollectionEquals(const std::vector<Datum>& left,
-                             const std::vector<Datum>& right) {
-  if (left.size() != right.size()) {
-    return false;
-  }
-
-  for (size_t i = 0; i < left.size(); i++) {
-    if (!left[i].Equals(right[i])) {
-      return false;
-    }
-  }
-  return true;
-}
 
 Datum::Datum(const Array& value) : Datum(value.data()) {}
 
@@ -55,7 +42,6 @@ Datum::Datum(const std::shared_ptr<Array>& value)
 Datum::Datum(std::shared_ptr<ChunkedArray> value) : value(std::move(value)) {}
 Datum::Datum(std::shared_ptr<RecordBatch> value) : value(std::move(value)) {}
 Datum::Datum(std::shared_ptr<Table> value) : value(std::move(value)) {}
-Datum::Datum(std::vector<Datum> value) : value(std::move(value)) {}
 
 Datum::Datum(bool value) : value(std::make_shared<BooleanScalar>(value)) {}
 Datum::Datum(int8_t value) : value(std::make_shared<Int8Scalar>(value)) {}
@@ -86,7 +72,7 @@ std::shared_ptr<Array> Datum::make_array() const {
   return MakeArray(util::get<std::shared_ptr<ArrayData>>(this->value));
 }
 
-std::shared_ptr<DataType> Datum::type() const {
+const std::shared_ptr<DataType>& Datum::type() const {
   if (this->kind() == Datum::ARRAY) {
     return util::get<std::shared_ptr<ArrayData>>(this->value)->type;
   }
@@ -96,28 +82,55 @@ std::shared_ptr<DataType> Datum::type() const {
   if (this->kind() == Datum::SCALAR) {
     return util::get<std::shared_ptr<Scalar>>(this->value)->type;
   }
-  return nullptr;
+  static std::shared_ptr<DataType> no_type;
+  return no_type;
 }
 
-std::shared_ptr<Schema> Datum::schema() const {
+const std::shared_ptr<Schema>& Datum::schema() const {
   if (this->kind() == Datum::RECORD_BATCH) {
     return util::get<std::shared_ptr<RecordBatch>>(this->value)->schema();
   }
   if (this->kind() == Datum::TABLE) {
     return util::get<std::shared_ptr<Table>>(this->value)->schema();
   }
-  return nullptr;
+  static std::shared_ptr<Schema> no_schema;
+  return no_schema;
 }
 
 int64_t Datum::length() const {
-  if (this->kind() == Datum::ARRAY) {
-    return util::get<std::shared_ptr<ArrayData>>(this->value)->length;
-  } else if (this->kind() == Datum::CHUNKED_ARRAY) {
-    return util::get<std::shared_ptr<ChunkedArray>>(this->value)->length();
-  } else if (this->kind() == Datum::SCALAR) {
-    return 1;
+  switch (this->kind()) {
+    case Datum::ARRAY:
+      return util::get<std::shared_ptr<ArrayData>>(this->value)->length;
+    case Datum::CHUNKED_ARRAY:
+      return util::get<std::shared_ptr<ChunkedArray>>(this->value)->length();
+    case Datum::RECORD_BATCH:
+      return util::get<std::shared_ptr<RecordBatch>>(this->value)->num_rows();
+    case Datum::TABLE:
+      return util::get<std::shared_ptr<Table>>(this->value)->num_rows();
+    case Datum::SCALAR:
+      return 1;
+    default:
+      return kUnknownLength;
   }
-  return kUnknownLength;
+}
+
+int64_t Datum::TotalBufferSize() const {
+  switch (this->kind()) {
+    case Datum::ARRAY:
+      return util::TotalBufferSize(*util::get<std::shared_ptr<ArrayData>>(this->value));
+    case Datum::CHUNKED_ARRAY:
+      return util::TotalBufferSize(
+          *util::get<std::shared_ptr<ChunkedArray>>(this->value));
+    case Datum::RECORD_BATCH:
+      return util::TotalBufferSize(*util::get<std::shared_ptr<RecordBatch>>(this->value));
+    case Datum::TABLE:
+      return util::TotalBufferSize(*util::get<std::shared_ptr<Table>>(this->value));
+    case Datum::SCALAR:
+      return 0;
+    default:
+      DCHECK(false);
+      return 0;
+  }
 }
 
 int64_t Datum::null_count() const {
@@ -160,8 +173,6 @@ bool Datum::Equals(const Datum& other) const {
       return internal::SharedPtrEquals(this->record_batch(), other.record_batch());
     case Datum::TABLE:
       return internal::SharedPtrEquals(this->table(), other.table());
-    case Datum::COLLECTION:
-      return CollectionEquals(this->collection(), other.collection());
     default:
       return false;
   }
@@ -240,19 +251,6 @@ std::string Datum::ToString() const {
       return "RecordBatch";
     case Datum::TABLE:
       return "Table";
-    case Datum::COLLECTION: {
-      std::stringstream ss;
-      ss << "Collection(";
-      const auto& values = this->collection();
-      for (size_t i = 0; i < values.size(); ++i) {
-        if (i > 0) {
-          ss << ", ";
-        }
-        ss << values[i].ToString();
-      }
-      ss << ')';
-      return ss.str();
-    }
     default:
       DCHECK(false);
       return "";

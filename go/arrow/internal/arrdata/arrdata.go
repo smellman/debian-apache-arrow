@@ -15,21 +15,23 @@
 // limitations under the License.
 
 // Package arrdata exports arrays and records data ready to be used for tests.
-package arrdata // import "github.com/apache/arrow/go/arrow/internal/arrdata"
+package arrdata
 
 import (
 	"fmt"
 	"sort"
 
-	"github.com/apache/arrow/go/arrow"
-	"github.com/apache/arrow/go/arrow/array"
-	"github.com/apache/arrow/go/arrow/decimal128"
-	"github.com/apache/arrow/go/arrow/float16"
-	"github.com/apache/arrow/go/arrow/memory"
+	"github.com/apache/arrow/go/v7/arrow"
+	"github.com/apache/arrow/go/v7/arrow/array"
+	"github.com/apache/arrow/go/v7/arrow/decimal128"
+	"github.com/apache/arrow/go/v7/arrow/float16"
+	"github.com/apache/arrow/go/v7/arrow/internal/testing/types"
+	"github.com/apache/arrow/go/v7/arrow/ipc"
+	"github.com/apache/arrow/go/v7/arrow/memory"
 )
 
 var (
-	Records     = make(map[string][]array.Record)
+	Records     = make(map[string][]arrow.Record)
 	RecordNames []string
 )
 
@@ -45,6 +47,8 @@ func init() {
 	Records["intervals"] = makeIntervalsRecords()
 	Records["durations"] = makeDurationsRecords()
 	Records["decimal128"] = makeDecimal128sRecords()
+	Records["maps"] = makeMapsRecords()
+	Records["extension"] = makeExtensionRecords()
 
 	for k := range Records {
 		RecordNames = append(RecordNames, k)
@@ -52,7 +56,7 @@ func init() {
 	sort.Strings(RecordNames)
 }
 
-func makeNullRecords() []array.Record {
+func makeNullRecords() []arrow.Record {
 	mem := memory.NewGoAllocator()
 
 	meta := arrow.NewMetadata(
@@ -67,14 +71,14 @@ func makeNullRecords() []array.Record {
 	)
 
 	mask := []bool{true, false, false, true, true}
-	chunks := [][]array.Interface{
-		[]array.Interface{
+	chunks := [][]arrow.Array{
+		[]arrow.Array{
 			arrayOf(mem, []nullT{null, null, null, null, null}, mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, []nullT{null, null, null, null, null}, mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, []nullT{null, null, null, null, null}, mask),
 		},
 	}
@@ -87,7 +91,7 @@ func makeNullRecords() []array.Record {
 		}
 	}()
 
-	recs := make([]array.Record, len(chunks))
+	recs := make([]arrow.Record, len(chunks))
 	for i, chunk := range chunks {
 		recs[i] = array.NewRecord(schema, chunk, -1)
 	}
@@ -95,7 +99,7 @@ func makeNullRecords() []array.Record {
 	return recs
 }
 
-func makePrimitiveRecords() []array.Record {
+func makePrimitiveRecords() []arrow.Record {
 	mem := memory.NewGoAllocator()
 
 	meta := arrow.NewMetadata(
@@ -120,8 +124,8 @@ func makePrimitiveRecords() []array.Record {
 	)
 
 	mask := []bool{true, false, false, true, true}
-	chunks := [][]array.Interface{
-		[]array.Interface{
+	chunks := [][]arrow.Array{
+		[]arrow.Array{
 			arrayOf(mem, []bool{true, false, true, false, true}, mask),
 			arrayOf(mem, []int8{-1, -2, -3, -4, -5}, mask),
 			arrayOf(mem, []int16{-1, -2, -3, -4, -5}, mask),
@@ -134,7 +138,7 @@ func makePrimitiveRecords() []array.Record {
 			arrayOf(mem, []float32{+1, +2, +3, +4, +5}, mask),
 			arrayOf(mem, []float64{+1, +2, +3, +4, +5}, mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, []bool{true, false, true, false, true}, mask),
 			arrayOf(mem, []int8{-11, -12, -13, -14, -15}, mask),
 			arrayOf(mem, []int16{-11, -12, -13, -14, -15}, mask),
@@ -147,7 +151,7 @@ func makePrimitiveRecords() []array.Record {
 			arrayOf(mem, []float32{+11, +12, +13, +14, +15}, mask),
 			arrayOf(mem, []float64{+11, +12, +13, +14, +15}, mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, []bool{true, false, true, false, true}, mask),
 			arrayOf(mem, []int8{-21, -22, -23, -24, -25}, mask),
 			arrayOf(mem, []int16{-21, -22, -23, -24, -25}, mask),
@@ -170,7 +174,7 @@ func makePrimitiveRecords() []array.Record {
 		}
 	}()
 
-	recs := make([]array.Record, len(chunks))
+	recs := make([]arrow.Record, len(chunks))
 	for i, chunk := range chunks {
 		recs[i] = array.NewRecord(schema, chunk, -1)
 	}
@@ -178,7 +182,7 @@ func makePrimitiveRecords() []array.Record {
 	return recs
 }
 
-func makeStructsRecords() []array.Record {
+func makeStructsRecords() []arrow.Record {
 	mem := memory.NewGoAllocator()
 
 	fields := []arrow.Field{
@@ -189,50 +193,50 @@ func makeStructsRecords() []array.Record {
 	schema := arrow.NewSchema([]arrow.Field{{Name: "struct_nullable", Type: dtype, Nullable: true}}, nil)
 
 	mask := []bool{true, false, false, true, true, true, false, true}
-	chunks := [][]array.Interface{
-		[]array.Interface{
-			structOf(mem, dtype, [][]array.Interface{
-				[]array.Interface{
+	chunks := [][]arrow.Array{
+		[]arrow.Array{
+			structOf(mem, dtype, [][]arrow.Array{
+				[]arrow.Array{
 					arrayOf(mem, []int32{-1, -2, -3, -4, -5}, mask[:5]),
 					arrayOf(mem, []string{"111", "222", "333", "444", "555"}, mask[:5]),
 				},
-				[]array.Interface{
+				[]arrow.Array{
 					arrayOf(mem, []int32{-11, -12, -13, -14, -15}, mask[:5]),
 					arrayOf(mem, []string{"1111", "1222", "1333", "1444", "1555"}, mask[:5]),
 				},
-				[]array.Interface{
+				[]arrow.Array{
 					arrayOf(mem, []int32{-21, -22, -23, -24, -25}, mask[:5]),
 					arrayOf(mem, []string{"2111", "2222", "2333", "2444", "2555"}, mask[:5]),
 				},
-				[]array.Interface{
+				[]arrow.Array{
 					arrayOf(mem, []int32{-31, -32, -33, -34, -35}, mask[:5]),
 					arrayOf(mem, []string{"3111", "3222", "3333", "3444", "3555"}, mask[:5]),
 				},
-				[]array.Interface{
+				[]arrow.Array{
 					arrayOf(mem, []int32{-41, -42, -43, -44, -45}, mask[:5]),
 					arrayOf(mem, []string{"4111", "4222", "4333", "4444", "4555"}, mask[:5]),
 				},
 			}, []bool{true, false, true, true, true}),
 		},
-		[]array.Interface{
-			structOf(mem, dtype, [][]array.Interface{
-				[]array.Interface{
+		[]arrow.Array{
+			structOf(mem, dtype, [][]arrow.Array{
+				[]arrow.Array{
 					arrayOf(mem, []int32{1, 2, 3, 4, 5}, mask[:5]),
 					arrayOf(mem, []string{"-111", "-222", "-333", "-444", "-555"}, mask[:5]),
 				},
-				[]array.Interface{
+				[]arrow.Array{
 					arrayOf(mem, []int32{11, 12, 13, 14, 15}, mask[:5]),
 					arrayOf(mem, []string{"-1111", "-1222", "-1333", "-1444", "-1555"}, mask[:5]),
 				},
-				[]array.Interface{
+				[]arrow.Array{
 					arrayOf(mem, []int32{21, 22, 23, 24, 25}, mask[:5]),
 					arrayOf(mem, []string{"-2111", "-2222", "-2333", "-2444", "-2555"}, mask[:5]),
 				},
-				[]array.Interface{
+				[]arrow.Array{
 					arrayOf(mem, []int32{31, 32, 33, 34, 35}, mask[:5]),
 					arrayOf(mem, []string{"-3111", "-3222", "-3333", "-3444", "-3555"}, mask[:5]),
 				},
-				[]array.Interface{
+				[]arrow.Array{
 					arrayOf(mem, []int32{41, 42, 43, 44, 45}, mask[:5]),
 					arrayOf(mem, []string{"-4111", "-4222", "-4333", "-4444", "-4555"}, mask[:5]),
 				},
@@ -248,7 +252,7 @@ func makeStructsRecords() []array.Record {
 		}
 	}()
 
-	recs := make([]array.Record, len(chunks))
+	recs := make([]arrow.Record, len(chunks))
 	for i, chunk := range chunks {
 		recs[i] = array.NewRecord(schema, chunk, -1)
 	}
@@ -256,7 +260,7 @@ func makeStructsRecords() []array.Record {
 	return recs
 }
 
-func makeListsRecords() []array.Record {
+func makeListsRecords() []arrow.Record {
 	mem := memory.NewGoAllocator()
 	dtype := arrow.ListOf(arrow.PrimitiveTypes.Int32)
 	schema := arrow.NewSchema([]arrow.Field{
@@ -265,30 +269,30 @@ func makeListsRecords() []array.Record {
 
 	mask := []bool{true, false, false, true, true}
 
-	chunks := [][]array.Interface{
-		[]array.Interface{
-			listOf(mem, []array.Interface{
+	chunks := [][]arrow.Array{
+		[]arrow.Array{
+			listOf(mem, []arrow.Array{
 				arrayOf(mem, []int32{1, 2, 3, 4, 5}, mask),
 				arrayOf(mem, []int32{11, 12, 13, 14, 15}, mask),
 				arrayOf(mem, []int32{21, 22, 23, 24, 25}, mask),
 			}, nil),
 		},
-		[]array.Interface{
-			listOf(mem, []array.Interface{
+		[]arrow.Array{
+			listOf(mem, []arrow.Array{
 				arrayOf(mem, []int32{-1, -2, -3, -4, -5}, mask),
 				arrayOf(mem, []int32{-11, -12, -13, -14, -15}, mask),
 				arrayOf(mem, []int32{-21, -22, -23, -24, -25}, mask),
 			}, nil),
 		},
-		[]array.Interface{
-			listOf(mem, []array.Interface{
+		[]arrow.Array{
+			listOf(mem, []arrow.Array{
 				arrayOf(mem, []int32{-1, -2, -3, -4, -5}, mask),
 				arrayOf(mem, []int32{-11, -12, -13, -14, -15}, mask),
 				arrayOf(mem, []int32{-21, -22, -23, -24, -25}, mask),
 			}, []bool{true, false, true}),
 		},
-		[]array.Interface{
-			func() array.Interface {
+		[]arrow.Array{
+			func() arrow.Array {
 				bldr := array.NewListBuilder(mem, arrow.PrimitiveTypes.Int32)
 				defer bldr.Release()
 
@@ -305,7 +309,7 @@ func makeListsRecords() []array.Record {
 		}
 	}()
 
-	recs := make([]array.Record, len(chunks))
+	recs := make([]arrow.Record, len(chunks))
 	for i, chunk := range chunks {
 		recs[i] = array.NewRecord(schema, chunk, -1)
 	}
@@ -313,7 +317,7 @@ func makeListsRecords() []array.Record {
 	return recs
 }
 
-func makeFixedSizeListsRecords() []array.Record {
+func makeFixedSizeListsRecords() []arrow.Record {
 	mem := memory.NewGoAllocator()
 	const N = 3
 	dtype := arrow.FixedSizeListOf(N, arrow.PrimitiveTypes.Int32)
@@ -323,23 +327,23 @@ func makeFixedSizeListsRecords() []array.Record {
 
 	mask := []bool{true, false, true}
 
-	chunks := [][]array.Interface{
-		[]array.Interface{
-			fixedSizeListOf(mem, N, []array.Interface{
+	chunks := [][]arrow.Array{
+		[]arrow.Array{
+			fixedSizeListOf(mem, N, []arrow.Array{
 				arrayOf(mem, []int32{1, 2, 3}, mask),
 				arrayOf(mem, []int32{11, 12, 13}, mask),
 				arrayOf(mem, []int32{21, 22, 23}, mask),
 			}, nil),
 		},
-		[]array.Interface{
-			fixedSizeListOf(mem, N, []array.Interface{
+		[]arrow.Array{
+			fixedSizeListOf(mem, N, []arrow.Array{
 				arrayOf(mem, []int32{-1, -2, -3}, mask),
 				arrayOf(mem, []int32{-11, -12, -13}, mask),
 				arrayOf(mem, []int32{-21, -22, -23}, mask),
 			}, nil),
 		},
-		[]array.Interface{
-			fixedSizeListOf(mem, N, []array.Interface{
+		[]arrow.Array{
+			fixedSizeListOf(mem, N, []arrow.Array{
 				arrayOf(mem, []int32{-1, -2, -3}, mask),
 				arrayOf(mem, []int32{-11, -12, -13}, mask),
 				arrayOf(mem, []int32{-21, -22, -23}, mask),
@@ -355,7 +359,7 @@ func makeFixedSizeListsRecords() []array.Record {
 		}
 	}()
 
-	recs := make([]array.Record, len(chunks))
+	recs := make([]arrow.Record, len(chunks))
 	for i, chunk := range chunks {
 		recs[i] = array.NewRecord(schema, chunk, -1)
 	}
@@ -363,7 +367,7 @@ func makeFixedSizeListsRecords() []array.Record {
 	return recs
 }
 
-func makeStringsRecords() []array.Record {
+func makeStringsRecords() []arrow.Record {
 	mem := memory.NewGoAllocator()
 	schema := arrow.NewSchema([]arrow.Field{
 		{Name: "strings", Type: arrow.BinaryTypes.String},
@@ -371,16 +375,16 @@ func makeStringsRecords() []array.Record {
 	}, nil)
 
 	mask := []bool{true, false, false, true, true}
-	chunks := [][]array.Interface{
-		[]array.Interface{
+	chunks := [][]arrow.Array{
+		[]arrow.Array{
 			arrayOf(mem, []string{"1é", "2", "3", "4", "5"}, mask),
 			arrayOf(mem, [][]byte{[]byte("1é"), []byte("2"), []byte("3"), []byte("4"), []byte("5")}, mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, []string{"11", "22", "33", "44", "55"}, mask),
 			arrayOf(mem, [][]byte{[]byte("11"), []byte("22"), []byte("33"), []byte("44"), []byte("55")}, mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, []string{"111", "222", "333", "444", "555"}, mask),
 			arrayOf(mem, [][]byte{[]byte("111"), []byte("222"), []byte("333"), []byte("444"), []byte("555")}, mask),
 		},
@@ -394,7 +398,7 @@ func makeStringsRecords() []array.Record {
 		}
 	}()
 
-	recs := make([]array.Record, len(chunks))
+	recs := make([]arrow.Record, len(chunks))
 	for i, chunk := range chunks {
 		recs[i] = array.NewRecord(schema, chunk, -1)
 	}
@@ -418,7 +422,7 @@ var (
 	null nullT
 )
 
-func makeFixedWidthTypesRecords() []array.Record {
+func makeFixedWidthTypesRecords() []arrow.Record {
 	mem := memory.NewGoAllocator()
 	schema := arrow.NewSchema(
 		[]arrow.Field{
@@ -445,8 +449,8 @@ func makeFixedWidthTypesRecords() []array.Record {
 	}
 
 	mask := []bool{true, false, false, true, true}
-	chunks := [][]array.Interface{
-		[]array.Interface{
+	chunks := [][]arrow.Array{
+		[]arrow.Array{
 			arrayOf(mem, float16s([]float32{+1, +2, +3, +4, +5}), mask),
 			arrayOf(mem, []time32ms{-2, -1, 0, +1, +2}, mask),
 			arrayOf(mem, []time32s{-2, -1, 0, +1, +2}, mask),
@@ -459,7 +463,7 @@ func makeFixedWidthTypesRecords() []array.Record {
 			arrayOf(mem, []arrow.Date32{-2, -1, 0, +1, +2}, mask),
 			arrayOf(mem, []arrow.Date64{-2, -1, 0, +1, +2}, mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, float16s([]float32{+11, +12, +13, +14, +15}), mask),
 			arrayOf(mem, []time32ms{-12, -11, 10, +11, +12}, mask),
 			arrayOf(mem, []time32s{-12, -11, 10, +11, +12}, mask),
@@ -472,7 +476,7 @@ func makeFixedWidthTypesRecords() []array.Record {
 			arrayOf(mem, []arrow.Date32{-12, -11, 10, +11, +12}, mask),
 			arrayOf(mem, []arrow.Date64{-12, -11, 10, +11, +12}, mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, float16s([]float32{+21, +22, +23, +24, +25}), mask),
 			arrayOf(mem, []time32ms{-22, -21, 20, +21, +22}, mask),
 			arrayOf(mem, []time32s{-22, -21, 20, +21, +22}, mask),
@@ -495,7 +499,7 @@ func makeFixedWidthTypesRecords() []array.Record {
 		}
 	}()
 
-	recs := make([]array.Record, len(chunks))
+	recs := make([]arrow.Record, len(chunks))
 	for i, chunk := range chunks {
 		recs[i] = array.NewRecord(schema, chunk, -1)
 	}
@@ -505,7 +509,7 @@ func makeFixedWidthTypesRecords() []array.Record {
 
 type fsb3 string
 
-func makeFixedSizeBinariesRecords() []array.Record {
+func makeFixedSizeBinariesRecords() []arrow.Record {
 	mem := memory.NewGoAllocator()
 	schema := arrow.NewSchema(
 		[]arrow.Field{
@@ -514,14 +518,14 @@ func makeFixedSizeBinariesRecords() []array.Record {
 	)
 
 	mask := []bool{true, false, false, true, true}
-	chunks := [][]array.Interface{
-		[]array.Interface{
+	chunks := [][]arrow.Array{
+		[]arrow.Array{
 			arrayOf(mem, []fsb3{"001", "002", "003", "004", "005"}, mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, []fsb3{"011", "012", "013", "014", "015"}, mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, []fsb3{"021", "022", "023", "024", "025"}, mask),
 		},
 	}
@@ -534,7 +538,7 @@ func makeFixedSizeBinariesRecords() []array.Record {
 		}
 	}()
 
-	recs := make([]array.Record, len(chunks))
+	recs := make([]arrow.Record, len(chunks))
 	for i, chunk := range chunks {
 		recs[i] = array.NewRecord(schema, chunk, -1)
 	}
@@ -542,29 +546,33 @@ func makeFixedSizeBinariesRecords() []array.Record {
 	return recs
 }
 
-func makeIntervalsRecords() []array.Record {
+func makeIntervalsRecords() []arrow.Record {
 	mem := memory.NewGoAllocator()
 
 	schema := arrow.NewSchema(
 		[]arrow.Field{
 			arrow.Field{Name: "months", Type: arrow.FixedWidthTypes.MonthInterval, Nullable: true},
 			arrow.Field{Name: "days", Type: arrow.FixedWidthTypes.DayTimeInterval, Nullable: true},
+			arrow.Field{Name: "nanos", Type: arrow.FixedWidthTypes.MonthDayNanoInterval, Nullable: true},
 		}, nil,
 	)
 
 	mask := []bool{true, false, false, true, true}
-	chunks := [][]array.Interface{
-		[]array.Interface{
+	chunks := [][]arrow.Array{
+		[]arrow.Array{
 			arrayOf(mem, []arrow.MonthInterval{1, 2, 3, 4, 5}, mask),
 			arrayOf(mem, []arrow.DayTimeInterval{{1, 1}, {2, 2}, {3, 3}, {4, 4}, {5, 5}}, mask),
+			arrayOf(mem, []arrow.MonthDayNanoInterval{{1, 1, 1000}, {2, 2, 2000}, {3, 3, 3000}, {4, 4, 4000}, {5, 5, 5000}}, mask),
 		},
-		[]array.Interface{
-			arrayOf(mem, []arrow.MonthInterval{11, 12, 13, 14, 15}, mask),
-			arrayOf(mem, []arrow.DayTimeInterval{{11, 11}, {12, 12}, {13, 13}, {14, 14}, {15, 15}}, mask),
+		[]arrow.Array{
+			arrayOf(mem, []arrow.MonthInterval{-11, -12, -13, -14, -15}, mask),
+			arrayOf(mem, []arrow.DayTimeInterval{{-11, -11}, {-12, -12}, {-13, -13}, {-14, -14}, {-15, -15}}, mask),
+			arrayOf(mem, []arrow.MonthDayNanoInterval{{-11, -11, -11000}, {-12, -12, -12000}, {-13, -13, -13000}, {-14, -14, -14000}, {-15, -15, -15000}}, mask),
 		},
-		[]array.Interface{
-			arrayOf(mem, []arrow.MonthInterval{21, 22, 23, 24, 25}, mask),
-			arrayOf(mem, []arrow.DayTimeInterval{{21, 21}, {22, 22}, {23, 23}, {24, 24}, {25, 25}}, mask),
+		[]arrow.Array{
+			arrayOf(mem, []arrow.MonthInterval{21, 22, 23, 24, 25, 0}, append(mask, true)),
+			arrayOf(mem, []arrow.DayTimeInterval{{21, 21}, {22, 22}, {23, 23}, {24, 24}, {25, 25}, {0, 0}}, append(mask, true)),
+			arrayOf(mem, []arrow.MonthDayNanoInterval{{21, 21, 21000}, {22, 22, 22000}, {23, 23, 23000}, {24, 24, 24000}, {25, 25, 25000}, {0, 0, 0}}, append(mask, true)),
 		},
 	}
 
@@ -576,7 +584,7 @@ func makeIntervalsRecords() []array.Record {
 		}
 	}()
 
-	recs := make([]array.Record, len(chunks))
+	recs := make([]arrow.Record, len(chunks))
 	for i, chunk := range chunks {
 		recs[i] = array.NewRecord(schema, chunk, -1)
 	}
@@ -591,7 +599,7 @@ type (
 	duration_ns arrow.Duration
 )
 
-func makeDurationsRecords() []array.Record {
+func makeDurationsRecords() []arrow.Record {
 	mem := memory.NewGoAllocator()
 
 	schema := arrow.NewSchema(
@@ -604,20 +612,20 @@ func makeDurationsRecords() []array.Record {
 	)
 
 	mask := []bool{true, false, false, true, true}
-	chunks := [][]array.Interface{
-		[]array.Interface{
+	chunks := [][]arrow.Array{
+		[]arrow.Array{
 			arrayOf(mem, []duration_s{1, 2, 3, 4, 5}, mask),
 			arrayOf(mem, []duration_ms{1, 2, 3, 4, 5}, mask),
 			arrayOf(mem, []duration_us{1, 2, 3, 4, 5}, mask),
 			arrayOf(mem, []duration_ns{1, 2, 3, 4, 5}, mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, []duration_s{11, 12, 13, 14, 15}, mask),
 			arrayOf(mem, []duration_ms{11, 12, 13, 14, 15}, mask),
 			arrayOf(mem, []duration_us{11, 12, 13, 14, 15}, mask),
 			arrayOf(mem, []duration_ns{11, 12, 13, 14, 15}, mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, []duration_s{21, 22, 23, 24, 25}, mask),
 			arrayOf(mem, []duration_ms{21, 22, 23, 24, 25}, mask),
 			arrayOf(mem, []duration_us{21, 22, 23, 24, 25}, mask),
@@ -633,7 +641,7 @@ func makeDurationsRecords() []array.Record {
 		}
 	}()
 
-	recs := make([]array.Record, len(chunks))
+	recs := make([]arrow.Record, len(chunks))
 	for i, chunk := range chunks {
 		recs[i] = array.NewRecord(schema, chunk, -1)
 	}
@@ -645,7 +653,7 @@ var (
 	decimal128Type = &arrow.Decimal128Type{Precision: 10, Scale: 1}
 )
 
-func makeDecimal128sRecords() []array.Record {
+func makeDecimal128sRecords() []arrow.Record {
 	mem := memory.NewGoAllocator()
 	schema := arrow.NewSchema(
 		[]arrow.Field{
@@ -662,14 +670,14 @@ func makeDecimal128sRecords() []array.Record {
 	}
 
 	mask := []bool{true, false, false, true, true}
-	chunks := [][]array.Interface{
-		[]array.Interface{
+	chunks := [][]arrow.Array{
+		[]arrow.Array{
 			arrayOf(mem, dec128s([]int64{31, 32, 33, 34, 35}), mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, dec128s([]int64{41, 42, 43, 44, 45}), mask),
 		},
-		[]array.Interface{
+		[]arrow.Array{
 			arrayOf(mem, dec128s([]int64{51, 52, 53, 54, 55}), mask),
 		},
 	}
@@ -682,7 +690,7 @@ func makeDecimal128sRecords() []array.Record {
 		}
 	}()
 
-	recs := make([]array.Record, len(chunks))
+	recs := make([]arrow.Record, len(chunks))
 	for i, chunk := range chunks {
 		recs[i] = array.NewRecord(schema, chunk, -1)
 	}
@@ -690,7 +698,225 @@ func makeDecimal128sRecords() []array.Record {
 	return recs
 }
 
-func arrayOf(mem memory.Allocator, a interface{}, valids []bool) array.Interface {
+func makeMapsRecords() []arrow.Record {
+	mem := memory.NewGoAllocator()
+	dtype := arrow.MapOf(arrow.PrimitiveTypes.Int32, arrow.BinaryTypes.String)
+	dtype.KeysSorted = true
+	schema := arrow.NewSchema([]arrow.Field{{Name: "map_int_utf8", Type: dtype, Nullable: true}}, nil)
+
+	mask := []bool{true, false, false, true, true}
+	chunks := [][]arrow.Array{
+		{
+			mapOf(mem, dtype.KeysSorted, []arrow.Array{
+				structOf(mem, dtype.ValueType(), [][]arrow.Array{
+					{
+						arrayOf(mem, []int32{-1, -2, -3, -4, -5}, nil),
+						arrayOf(mem, []string{"111", "222", "333", "444", "555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{-1, -2, -3, -4, -5}, nil),
+						arrayOf(mem, []string{"1111", "1222", "1333", "1444", "1555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{-1, -2, -3, -4, -5}, nil),
+						arrayOf(mem, []string{"2111", "2222", "2333", "2444", "2555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{-1, -2, -3, -4, -5}, nil),
+						arrayOf(mem, []string{"3111", "3222", "3333", "3444", "3555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{-1, -2, -3, -4, -5}, nil),
+						arrayOf(mem, []string{"4111", "4222", "4333", "4444", "4555"}, mask[:5]),
+					},
+				}, nil),
+				structOf(mem, dtype.ValueType(), [][]arrow.Array{
+					{
+						arrayOf(mem, []int32{1, 2, 3, 4, 5}, nil),
+						arrayOf(mem, []string{"-111", "-222", "-333", "-444", "-555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{1, 2, 3, 4, 5}, nil),
+						arrayOf(mem, []string{"-1111", "-1222", "-1333", "-1444", "-1555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{1, 2, 3, 4, 5}, nil),
+						arrayOf(mem, []string{"-2111", "-2222", "-2333", "-2444", "-2555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{1, 2, 3, 4, 5}, nil),
+						arrayOf(mem, []string{"-3111", "-3222", "-3333", "-3444", "-3555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{1, 2, 3, 4, 5}, nil),
+						arrayOf(mem, []string{"-4111", "-4222", "-4333", "-4444", "-4555"}, mask[:5]),
+					},
+				}, nil),
+			}, []bool{true, false, true, true, true}),
+		},
+		{
+			mapOf(mem, dtype.KeysSorted, []arrow.Array{
+				structOf(mem, dtype.ValueType(), [][]arrow.Array{
+					{
+						arrayOf(mem, []int32{1, 2, 3, 4, 5}, nil),
+						arrayOf(mem, []string{"-111", "-222", "-333", "-444", "-555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{1, 2, 3, 4, 5}, nil),
+						arrayOf(mem, []string{"-1111", "-1222", "-1333", "-1444", "-1555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{1, 2, 3, 4, 5}, nil),
+						arrayOf(mem, []string{"-2111", "-2222", "-2333", "-2444", "-2555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{1, 2, 3, 4, 5}, nil),
+						arrayOf(mem, []string{"-3111", "-3222", "-3333", "-3444", "-3555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{1, 2, 3, 4, 5}, nil),
+						arrayOf(mem, []string{"-4111", "-4222", "-4333", "-4444", "-4555"}, mask[:5]),
+					},
+				}, nil),
+				structOf(mem, dtype.ValueType(), [][]arrow.Array{
+					{
+						arrayOf(mem, []int32{-1, -2, -3, -4, -5}, nil),
+						arrayOf(mem, []string{"111", "222", "333", "444", "555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{-1, -2, -3, -4, -5}, nil),
+						arrayOf(mem, []string{"1111", "1222", "1333", "1444", "1555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{-1, -2, -3, -4, -5}, nil),
+						arrayOf(mem, []string{"2111", "2222", "2333", "2444", "2555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{-1, -2, -3, -4, -5}, nil),
+						arrayOf(mem, []string{"3111", "3222", "3333", "3444", "3555"}, mask[:5]),
+					},
+					{
+						arrayOf(mem, []int32{-1, -2, -3, -4, -5}, nil),
+						arrayOf(mem, []string{"4111", "4222", "4333", "4444", "4555"}, mask[:5]),
+					},
+				}, nil),
+			}, []bool{true, false, true, true, true}),
+		},
+	}
+
+	defer func() {
+		for _, chunk := range chunks {
+			for _, col := range chunk {
+				col.Release()
+			}
+		}
+	}()
+
+	recs := make([]arrow.Record, len(chunks))
+	for i, chunk := range chunks {
+		recs[i] = array.NewRecord(schema, chunk, -1)
+	}
+
+	return recs
+}
+
+func makeExtensionRecords() []arrow.Record {
+	mem := memory.NewGoAllocator()
+
+	p1Type := types.NewParametric1Type(6)
+	p2Type := types.NewParametric1Type(12)
+	p3Type := types.NewParametric2Type(2)
+	p4Type := types.NewParametric2Type(3)
+	p5Type := types.NewExtStructType()
+
+	arrow.RegisterExtensionType(p1Type)
+	arrow.RegisterExtensionType(p3Type)
+	arrow.RegisterExtensionType(p4Type)
+	arrow.RegisterExtensionType(p5Type)
+
+	meta := arrow.NewMetadata(
+		[]string{"k1", "k2"},
+		[]string{"v1", "v2"},
+	)
+
+	unregisteredMeta := arrow.NewMetadata(
+		append(meta.Keys(), ipc.ExtensionTypeKeyName, ipc.ExtensionMetadataKeyName),
+		append(meta.Values(), "unregistered", ""))
+
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "p1", Type: p1Type, Nullable: true, Metadata: meta},
+			{Name: "p2", Type: p2Type, Nullable: true, Metadata: meta},
+			{Name: "p3", Type: p3Type, Nullable: true, Metadata: meta},
+			{Name: "p4", Type: p4Type, Nullable: true, Metadata: meta},
+			{Name: "p5", Type: p5Type, Nullable: true, Metadata: meta},
+			{Name: "unreg", Type: arrow.PrimitiveTypes.Int8, Nullable: true, Metadata: unregisteredMeta},
+		}, nil)
+
+	mask := []bool{true, false, true, true, false}
+	chunks := [][]arrow.Array{
+		{
+			extArray(mem, p1Type, []int32{1, -1, 2, 3, -1}, mask),
+			extArray(mem, p2Type, []int32{2, -1, 3, 4, -1}, mask),
+			extArray(mem, p3Type, []int32{5, -1, 6, 7, 8}, mask),
+			extArray(mem, p4Type, []int32{5, -1, 7, 9, -1}, mask),
+			extArray(mem, p5Type, [][]arrow.Array{
+				{
+					arrayOf(mem, []int64{1, -1, 2, 3, -1}, mask),
+					arrayOf(mem, []float64{0.1, -1, 0.2, 0.3, -1}, mask),
+				},
+			}, mask),
+			arrayOf(mem, []int8{-1, -2, -3, -4, -5}, mask),
+		},
+		{
+			extArray(mem, p1Type, []int32{10, -1, 20, 30, -1}, mask),
+			extArray(mem, p2Type, []int32{20, -1, 30, 40, -1}, mask),
+			extArray(mem, p3Type, []int32{50, -1, 60, 70, 8}, mask),
+			extArray(mem, p4Type, []int32{50, -1, 70, 90, -1}, mask),
+			extArray(mem, p5Type, [][]arrow.Array{
+				{
+					arrayOf(mem, []int64{10, -1, 20, 30, -1}, mask),
+					arrayOf(mem, []float64{0.01, -1, 0.02, 0.03, -1}, mask),
+				},
+			}, mask),
+			arrayOf(mem, []int8{-11, -12, -13, -14, -15}, mask),
+		},
+	}
+
+	defer func() {
+		for _, chunk := range chunks {
+			for _, col := range chunk {
+				col.Release()
+			}
+		}
+	}()
+
+	recs := make([]arrow.Record, len(chunks))
+	for i, chunk := range chunks {
+		recs[i] = array.NewRecord(schema, chunk, -1)
+	}
+
+	return recs
+}
+
+func extArray(mem memory.Allocator, dt arrow.ExtensionType, a interface{}, valids []bool) arrow.Array {
+	var storage arrow.Array
+	switch st := dt.StorageType().(type) {
+	case *arrow.StructType:
+		storage = structOf(mem, st, a.([][]arrow.Array), valids)
+	case *arrow.MapType:
+		storage = mapOf(mem, false, a.([]arrow.Array), valids)
+	case *arrow.ListType:
+		storage = listOf(mem, a.([]arrow.Array), valids)
+	default:
+		storage = arrayOf(mem, a, valids)
+	}
+	defer storage.Release()
+
+	return array.NewExtensionArrayWithStorage(dt, storage)
+}
+
+func arrayOf(mem memory.Allocator, a interface{}, valids []bool) arrow.Array {
 	if mem == nil {
 		mem = memory.NewGoAllocator()
 	}
@@ -931,6 +1157,13 @@ func arrayOf(mem memory.Allocator, a interface{}, valids []bool) array.Interface
 		bldr.AppendValues(a, valids)
 		return bldr.NewArray()
 
+	case []arrow.MonthDayNanoInterval:
+		bldr := array.NewMonthDayNanoIntervalBuilder(mem)
+		defer bldr.Release()
+
+		bldr.AppendValues(a, valids)
+		return bldr.NewArray()
+
 	case []duration_s:
 		bldr := array.NewDurationBuilder(mem, &arrow.DurationType{Unit: arrow.Second})
 		defer bldr.Release()
@@ -976,7 +1209,7 @@ func arrayOf(mem memory.Allocator, a interface{}, valids []bool) array.Interface
 	}
 }
 
-func listOf(mem memory.Allocator, values []array.Interface, valids []bool) *array.List {
+func listOf(mem memory.Allocator, values []arrow.Array, valids []bool) *array.List {
 	if mem == nil {
 		mem = memory.NewGoAllocator()
 	}
@@ -1000,7 +1233,7 @@ func listOf(mem memory.Allocator, values []array.Interface, valids []bool) *arra
 	return bldr.NewListArray()
 }
 
-func fixedSizeListOf(mem memory.Allocator, n int32, values []array.Interface, valids []bool) *array.FixedSizeList {
+func fixedSizeListOf(mem memory.Allocator, n int32, values []arrow.Array, valids []bool) *array.FixedSizeList {
 	if mem == nil {
 		mem = memory.NewGoAllocator()
 	}
@@ -1024,7 +1257,7 @@ func fixedSizeListOf(mem memory.Allocator, n int32, values []array.Interface, va
 	return bldr.NewListArray()
 }
 
-func structOf(mem memory.Allocator, dtype *arrow.StructType, fields [][]array.Interface, valids []bool) *array.Struct {
+func structOf(mem memory.Allocator, dtype *arrow.StructType, fields [][]arrow.Array, valids []bool) *array.Struct {
 	if mem == nil {
 		mem = memory.NewGoAllocator()
 	}
@@ -1050,7 +1283,34 @@ func structOf(mem memory.Allocator, dtype *arrow.StructType, fields [][]array.In
 	return bldr.NewStructArray()
 }
 
-func buildArray(bldr array.Builder, data array.Interface) {
+func mapOf(mem memory.Allocator, sortedKeys bool, values []arrow.Array, valids []bool) *array.Map {
+	if mem == nil {
+		mem = memory.NewGoAllocator()
+	}
+
+	pairType := values[0].DataType().(*arrow.StructType)
+	bldr := array.NewMapBuilder(mem, pairType.Field(0).Type, pairType.Field(1).Type, sortedKeys)
+	defer bldr.Release()
+
+	valid := func(i int) bool {
+		return valids[i]
+	}
+
+	if valids == nil {
+		valid = func(i int) bool { return true }
+	}
+
+	vb := bldr.ValueBuilder()
+	for i, value := range values {
+		bldr.Append(valid(i))
+		buildArray(vb.FieldBuilder(0), value.(*array.Struct).Field(0))
+		buildArray(vb.FieldBuilder(1), value.(*array.Struct).Field(1))
+	}
+
+	return bldr.NewMapArray()
+}
+
+func buildArray(bldr array.Builder, data arrow.Array) {
 	defer data.Release()
 
 	switch bldr := bldr.(type) {

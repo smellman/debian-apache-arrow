@@ -17,7 +17,6 @@
 
 ARG arch=amd64
 FROM ${arch}/debian:10
-ARG arch
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -60,25 +59,25 @@ RUN apt-get update -y -q && \
         libssl-dev \
         libthrift-dev \
         libutf8proc-dev \
-        libzstd-dev \
         llvm-${llvm}-dev \
         make \
         ninja-build \
         pkg-config \
         protobuf-compiler \
+        python3-pip \
         rapidjson-dev \
+        rsync \
         tzdata \
         zlib1g-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY ci/scripts/install_minio.sh \
-     /arrow/ci/scripts/
-RUN /arrow/ci/scripts/install_minio.sh ${arch} linux latest /usr/local
+COPY ci/scripts/install_minio.sh /arrow/ci/scripts/
+RUN /arrow/ci/scripts/install_minio.sh latest /usr/local
 
 ENV ARROW_BUILD_TESTS=ON \
-    ARROW_DEPENDENCY_SOURCE=SYSTEM \
     ARROW_DATASET=ON \
+    ARROW_DEPENDENCY_SOURCE=SYSTEM \
     ARROW_FLIGHT=ON \
     ARROW_GANDIVA=ON \
     ARROW_HOME=/usr/local \
@@ -101,4 +100,5 @@ ENV ARROW_BUILD_TESTS=ON \
     GTest_SOURCE=BUNDLED \
     ORC_SOURCE=BUNDLED \
     PATH=/usr/lib/ccache/:$PATH \
-    Protobuf_SOURCE=BUNDLED
+    Protobuf_SOURCE=BUNDLED \
+    zstd_SOURCE=BUNDLED
