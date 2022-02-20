@@ -3,4 +3,6 @@ TODO for Debian Arrow
 
 [X] Update Maintainer/Uploader in d/control
 [ ] Update d/copyright
+  [ ] Inquire with upstream what files are under the licenses in LICENSE.txt
+[ ] Re-activate CUDA/Flight/Gandiva once dependencies in Debian are ready
 [ ] Optional: clean out embedded code (not too much IIR)
