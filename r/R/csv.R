@@ -61,8 +61,8 @@
 #' * "l": `bool()`
 #' * "f": `dictionary()`
 #' * "D": `date32()`
-#' * "T": `time32()`
-#' * "t": `timestamp()`
+#' * "T": `timestamp()`
+#' * "t": `time32()`
 #' * "_": `null()`
 #' * "-": `null()`
 #' * "?": infer the type from the data
@@ -129,16 +129,14 @@
 #'
 #' @return A `data.frame`, or a Table if `as_data_frame = FALSE`.
 #' @export
-#' @examples
-#' \donttest{
-#'   tf <- tempfile()
-#'   on.exit(unlink(tf))
-#'   write.csv(mtcars, file = tf)
-#'   df <- read_csv_arrow(tf)
-#'   dim(df)
-#'   # Can select columns
-#'   df <- read_csv_arrow(tf, col_select = starts_with("d"))
-#' }
+#' @examplesIf arrow_available()
+#' tf <- tempfile()
+#' on.exit(unlink(tf))
+#' write.csv(mtcars, file = tf)
+#' df <- read_csv_arrow(tf)
+#' dim(df)
+#' # Can select columns
+#' df <- read_csv_arrow(tf, col_select = starts_with("d"))
 read_delim_arrow <- function(file,
                              delim = ",",
                              quote = '"',
@@ -194,7 +192,12 @@ read_delim_arrow <- function(file,
     convert_options = convert_options
   )
 
-  tab <- reader$Read()
+  tryCatch(
+    tab <- reader$Read(),
+    error = function(e) {
+      handle_csv_read_error(e, schema)
+    }
+  )
 
   # TODO: move this into convert_options using include_columns
   col_select <- enquo(col_select)
@@ -228,7 +231,6 @@ read_csv_arrow <- function(file,
                            read_options = NULL,
                            as_data_frame = TRUE,
                            timestamp_parsers = NULL) {
-
   mc <- match.call()
   mc$delim <- ","
   mc[[1]] <- get("read_delim_arrow", envir = asNamespace("arrow"))
@@ -254,7 +256,6 @@ read_tsv_arrow <- function(file,
                            read_options = NULL,
                            as_data_frame = TRUE,
                            timestamp_parsers = NULL) {
-
   mc <- match.call()
   mc$delim <- "\t"
   mc[[1]] <- get("read_delim_arrow", envir = asNamespace("arrow"))
@@ -287,7 +288,8 @@ read_tsv_arrow <- function(file,
 #'
 #' @include arrow-package.R
 #' @export
-CsvTableReader <- R6Class("CsvTableReader", inherit = ArrowObject,
+CsvTableReader <- R6Class("CsvTableReader",
+  inherit = ArrowObject,
   public = list(
     Read = function() csv___TableReader__Read(self)
   )
@@ -298,6 +300,11 @@ CsvTableReader$create <- function(file,
                                   convert_options = CsvConvertOptions$create(),
                                   ...) {
   assert_is(file, "InputStream")
+
+  if (!(tolower(read_options$encoding) %in% c("utf-8", "utf8"))) {
+    file <- MakeReencodeInputStream(file, read_options$encoding)
+  }
+
   csv___TableReader__Make(file, read_options, parse_options, convert_options)
 }
 
@@ -377,10 +384,16 @@ CsvTableReader$create <- function(file,
 #'    (a) `NULL`, the default, which uses the ISO-8601 parser;
 #'    (b) a character vector of [strptime][base::strptime()] parse strings; or
 #'    (c) a list of [TimestampParser] objects.
+#' - `encoding` The file encoding.
 #'
 #' `TimestampParser$create()` takes an optional `format` string argument.
 #' See [`strptime()`][base::strptime()] for example syntax.
 #' The default is to use an ISO-8601 format parser.
+#'
+#' The `CsvWriteOptions$create()` factory method takes the following arguments:
+#' - `include_header` Whether to write an initial header line with column names
+#' - `batch_size` Maximum number of rows processed at a time. Default is 1024.
+#'
 #' @section Active bindings:
 #'
 #' - `column_names`: from `CsvReadOptions`
@@ -388,6 +401,9 @@ CsvTableReader$create <- function(file,
 #' @export
 CsvReadOptions <- R6Class("CsvReadOptions",
   inherit = ArrowObject,
+  public = list(
+    encoding = NULL
+  ),
   active = list(
     column_names = function() csv___ReadOptions__column_names(self)
   )
@@ -396,14 +412,43 @@ CsvReadOptions$create <- function(use_threads = option_use_threads(),
                                   block_size = 1048576L,
                                   skip_rows = 0L,
                                   column_names = character(0),
-                                  autogenerate_column_names = FALSE) {
-  csv___ReadOptions__initialize(
+                                  autogenerate_column_names = FALSE,
+                                  encoding = "UTF-8") {
+  assert_that(is.string(encoding))
+
+  options <- csv___ReadOptions__initialize(
     list(
       use_threads = use_threads,
       block_size = block_size,
       skip_rows = skip_rows,
       column_names = column_names,
       autogenerate_column_names = autogenerate_column_names
+    )
+  )
+
+  options$encoding <- encoding
+  options
+}
+
+readr_to_csv_write_options <- function(include_header,
+                                       batch_size = 1024L) {
+  assert_that(is_integerish(batch_size, n = 1, finite = TRUE), batch_size > 0)
+  assert_that(is.logical(include_header))
+  CsvWriteOptions$create(
+    include_header = include_header,
+    batch_size = as.integer(batch_size)
+  )
+}
+
+#' @rdname CsvReadOptions
+#' @export
+CsvWriteOptions <- R6Class("CsvWriteOptions", inherit = ArrowObject)
+CsvWriteOptions$create <- function(include_header = TRUE, batch_size = 1024L) {
+  assert_that(is_integerish(batch_size, n = 1, finite = TRUE), batch_size > 0)
+  csv___WriteOptions__initialize(
+    list(
+      include_header = include_header,
+      batch_size = as.integer(batch_size)
     )
   )
 }
@@ -431,10 +476,9 @@ CsvParseOptions$create <- function(delimiter = ",",
                                    quote_char = '"',
                                    double_quote = TRUE,
                                    escaping = FALSE,
-                                   escape_char = '\\',
+                                   escape_char = "\\",
                                    newlines_in_values = FALSE,
                                    ignore_empty_lines = TRUE) {
-
   csv___ParseOptions__initialize(
     list(
       delimiter = delimiter,
@@ -462,7 +506,7 @@ readr_to_csv_parse_options <- function(delim = ",",
     quote_char = quote,
     double_quote = escape_double,
     escaping = escape_backslash,
-    escape_char = '\\',
+    escape_char = "\\",
     newlines_in_values = escape_backslash,
     ignore_empty_lines = skip_empty_rows
   )
@@ -473,7 +517,8 @@ readr_to_csv_parse_options <- function(delim = ",",
 #' @format NULL
 #' @docType class
 #' @export
-TimestampParser <- R6Class("TimestampParser", inherit = ArrowObject,
+TimestampParser <- R6Class("TimestampParser",
+  inherit = ArrowObject,
   public = list(
     kind = function() TimestampParser__kind(self),
     format = function() TimestampParser__format(self)
@@ -496,7 +541,7 @@ CsvConvertOptions <- R6Class("CsvConvertOptions", inherit = ArrowObject)
 CsvConvertOptions$create <- function(check_utf8 = TRUE,
                                      null_values = c("", "NA"),
                                      true_values = c("T", "true", "TRUE"),
-                                     false_values= c("F", "false", "FALSE"),
+                                     false_values = c("F", "false", "FALSE"),
                                      strings_can_be_null = FALSE,
                                      col_types = NULL,
                                      auto_dict_encode = FALSE,
@@ -504,7 +549,6 @@ CsvConvertOptions$create <- function(check_utf8 = TRUE,
                                      include_columns = character(),
                                      include_missing_columns = FALSE,
                                      timestamp_parsers = NULL) {
-
   if (!is.null(col_types) && !inherits(col_types, "Schema")) {
     abort(c(
       "Unsupported `col_types` specification.",
@@ -546,25 +590,25 @@ readr_to_csv_convert_options <- function(na,
       abort("Compact specification for `col_types` requires `col_names`")
     }
 
-    col_types <- set_names(nm = col_names, map2(specs, col_names, ~{
+    col_types <- set_names(nm = col_names, map2(specs, col_names, ~ {
       switch(.x,
-             "c" = utf8(),
-             "i" = int32(),
-             "n" = float64(),
-             "d" = float64(),
-             "l" = bool(),
-             "f" = dictionary(),
-             "D" = date32(),
-             "T" = time32(),
-             "t" = timestamp(),
-             "_" = null(),
-             "-" = null(),
-             "?" = NULL,
-             abort("Unsupported compact specification: '", .x,"' for column '", .y, "'")
+        "c" = utf8(),
+        "i" = int32(),
+        "n" = float64(),
+        "d" = float64(),
+        "l" = bool(),
+        "f" = dictionary(),
+        "D" = date32(),
+        "T" = timestamp(),
+        "t" = time32(),
+        "_" = null(),
+        "-" = null(),
+        "?" = NULL,
+        abort("Unsupported compact specification: '", .x, "' for column '", .y, "'")
       )
     }))
     # To "guess" types, omit them from col_types
-    col_types <- keep(col_types, ~!is.null(.x))
+    col_types <- keep(col_types, ~ !is.null(.x))
     col_types <- schema(!!!col_types)
   }
 
@@ -572,7 +616,7 @@ readr_to_csv_convert_options <- function(na,
     assert_is(col_types, "Schema")
     # If any columns are null(), drop them
     # (by specifying the other columns in include_columns)
-    nulls <- map_lgl(col_types$fields, ~.$type$Equals(null()))
+    nulls <- map_lgl(col_types$fields, ~ .$type$Equals(null()))
     if (any(nulls)) {
       include_columns <- setdiff(col_names, names(col_types)[nulls])
     }
@@ -584,4 +628,97 @@ readr_to_csv_convert_options <- function(na,
     timestamp_parsers = timestamp_parsers,
     include_columns = include_columns
   )
+}
+
+#' Write CSV file to disk
+#'
+#' @param x `data.frame`, [RecordBatch], or [Table]
+#' @param sink A string file path, URI, or [OutputStream], or path in a file
+#' system (`SubTreeFileSystem`)
+#' @param file file name. Specify this or `sink`, not both.
+#' @param include_header Whether to write an initial header line with column names
+#' @param col_names identical to `include_header`. Specify this or
+#'     `include_headers`, not both.
+#' @param batch_size Maximum number of rows processed at a time. Default is 1024.
+#' @param write_options see [file reader options][CsvWriteOptions]
+#' @param ... additional parameters
+#'
+#' @return The input `x`, invisibly. Note that if `sink` is an [OutputStream],
+#' the stream will be left open.
+#' @export
+#' @examplesIf arrow_available()
+#' tf <- tempfile()
+#' on.exit(unlink(tf))
+#' write_csv_arrow(mtcars, tf)
+#' @include arrow-package.R
+write_csv_arrow <- function(x,
+                            sink,
+                            file = NULL,
+                            include_header = TRUE,
+                            col_names = NULL,
+                            batch_size = 1024L,
+                            write_options = NULL,
+                            ...) {
+  unsupported_passed_args <- names(list(...))
+
+  if (length(unsupported_passed_args)) {
+    stop(
+      "The following ",
+      ngettext(length(unsupported_passed_args), "argument is ", "arguments are "),
+      "not yet supported in Arrow: ",
+      oxford_paste(unsupported_passed_args),
+      call. = FALSE
+    )
+  }
+
+  if (!missing(file) && !missing(sink)) {
+    stop(
+      "You have supplied both \"file\" and \"sink\" arguments. Please ",
+      "supply only one of them.",
+      call. = FALSE
+    )
+  }
+
+  if (missing(sink) && !missing(file)) {
+    sink <- file
+  }
+
+  if (!missing(col_names) && !missing(include_header)) {
+    stop(
+      "You have supplied both \"col_names\" and \"include_header\" ",
+      "arguments. Please supply only one of them.",
+      call. = FALSE
+    )
+  }
+
+  # default values are considered missing by base R
+  if (missing(include_header) && !missing(col_names)) {
+    include_header <- col_names
+  }
+
+  if (is.null(write_options)) {
+    write_options <- readr_to_csv_write_options(
+      include_header = include_header,
+      batch_size = batch_size)
+  }
+
+  x_out <- x
+  if (is.data.frame(x)) {
+    x <- Table$create(x)
+  }
+
+  assert_that(is_writable_table(x))
+
+  if (!inherits(sink, "OutputStream")) {
+    sink <- make_output_stream(sink)
+    on.exit(sink$close())
+  }
+
+  if (inherits(x, "RecordBatch")) {
+    csv___WriteCSV__RecordBatch(x, write_options, sink)
+  } else if (inherits(x, "Table")) {
+    csv___WriteCSV__Table(x, write_options, sink)
+  }
+
+  invisible(x_out)
 }

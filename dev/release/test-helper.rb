@@ -69,6 +69,28 @@ module GitRunnable
   def git_tags
     git("tags").lines(chomp: true)
   end
+
+  def parse_patch(patch)
+    diffs = []
+    in_hunk = false
+    patch.each_line do |line|
+      case line
+      when /\A--- a\//
+        path = $POSTMATCH.chomp
+        diffs << { path: path, hunks: [] }
+        in_hunk = false
+      when /\A@@/
+        in_hunk = true
+        diffs.last[:hunks] << []
+      when /\A[-+]/
+        next unless in_hunk
+        diffs.last[:hunks].last << line.chomp
+      end
+    end
+    diffs.sort_by do |diff|
+      diff[:path]
+    end
+  end
 end
 
 module VersionDetectable
@@ -76,9 +98,11 @@ module VersionDetectable
     top_dir = Pathname(__dir__).parent.parent
     cpp_cmake_lists = top_dir + "cpp" + "CMakeLists.txt"
     @snapshot_version = cpp_cmake_lists.read[/ARROW_VERSION "(.+?)"/, 1]
+    @snapshot_major_version = @snapshot_version.split(".")[0]
     @release_version = @snapshot_version.gsub(/-SNAPSHOT\z/, "")
     @so_version = compute_so_version(@release_version)
     @next_version = @release_version.gsub(/\A\d+/) {|major| major.succ}
+    @next_major_version = @next_version.split(".")[0]
     @next_snapshot_version = "#{@next_version}-SNAPSHOT"
     @next_so_version = compute_so_version(@next_version)
     r_description = top_dir + "r" + "DESCRIPTION"
@@ -92,5 +116,9 @@ module VersionDetectable
 
   def on_release_branch?
     @snapshot_version == @release_version
+  end
+
+  def omit_on_release_branch
+    omit("Not for release branch") if on_release_branch?
   end
 end

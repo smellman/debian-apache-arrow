@@ -34,7 +34,7 @@
 namespace arrow {
 namespace dataset {
 
-DatasetFactory::DatasetFactory() : root_partition_(literal(true)) {}
+DatasetFactory::DatasetFactory() : root_partition_(compute::literal(true)) {}
 
 Result<std::shared_ptr<Schema>> DatasetFactory::Inspect(InspectOptions options) {
   ARROW_ASSIGN_OR_RAISE(auto schemas, InspectSchemas(std::move(options)));
@@ -210,10 +210,21 @@ Result<std::shared_ptr<DatasetFactory>> FileSystemDatasetFactory::Make(
 Result<std::shared_ptr<DatasetFactory>> FileSystemDatasetFactory::Make(
     std::string uri, std::shared_ptr<FileFormat> format,
     FileSystemFactoryOptions options) {
+  // TODO Partitioning support. Dictionary support should be done before that. See
+  // ARROW-12481.
   std::string internal_path;
   ARROW_ASSIGN_OR_RAISE(std::shared_ptr<fs::FileSystem> filesystem,
-                        arrow::fs::FileSystemFromUri(uri, &internal_path))
+                        fs::FileSystemFromUri(uri, &internal_path))
   ARROW_ASSIGN_OR_RAISE(fs::FileInfo file_info, filesystem->GetFileInfo(internal_path))
+  if (file_info.IsDirectory()) {
+    fs::FileSelector selector;
+    selector.base_dir = file_info.path();
+    selector.recursive = true;
+    return arrow::dataset::FileSystemDatasetFactory::Make(
+        std::move(filesystem), std::move(selector), std::move(format),
+        std::move(options));
+  }
+  // is a single file
   return std::shared_ptr<DatasetFactory>(new FileSystemDatasetFactory(
       {file_info}, std::move(filesystem), std::move(format), std::move(options)));
 }
@@ -226,8 +237,14 @@ Result<std::vector<std::shared_ptr<Schema>>> FileSystemDatasetFactory::InspectSc
   int fragments = options.fragments;
   for (const auto& info : files_) {
     if (has_fragments_limit && fragments-- == 0) break;
-    ARROW_ASSIGN_OR_RAISE(auto schema, format_->Inspect({info, fs_}));
-    schemas.push_back(schema);
+    auto result = format_->Inspect({info, fs_});
+    if (ARROW_PREDICT_FALSE(!result.ok())) {
+      return result.status().WithMessage(
+          "Error creating dataset. Could not read schema from '", info.path(),
+          "': ", result.status().message(), ". Is this a '", format_->type_name(),
+          "' file?");
+    }
+    schemas.push_back(result.MoveValueUnsafe());
   }
 
   ARROW_ASSIGN_OR_RAISE(auto partition_schema,
@@ -268,7 +285,8 @@ Result<std::shared_ptr<Dataset>> FileSystemDatasetFactory::Finish(FinishOptions 
     fragments.push_back(fragment);
   }
 
-  return FileSystemDataset::Make(schema, root_partition_, format_, fs_, fragments);
+  return FileSystemDataset::Make(std::move(schema), root_partition_, format_, fs_,
+                                 std::move(fragments), std::move(partitioning));
 }
 
 }  // namespace dataset

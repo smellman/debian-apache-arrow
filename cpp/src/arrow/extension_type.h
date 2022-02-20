@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-/// User-defined extension types. EXPERIMENTAL in 0.13.0
+/// User-defined extension types.
 /// \since 0.13.0
 
 #pragma once
@@ -43,7 +43,10 @@ class ARROW_EXPORT ExtensionType : public DataType {
   static constexpr const char* type_name() { return "extension"; }
 
   /// \brief The type of array used to represent this extension type's data
-  std::shared_ptr<DataType> storage_type() const { return storage_type_; }
+  const std::shared_ptr<DataType>& storage_type() const { return storage_type_; }
+
+  /// \brief Return the type category of the storage type
+  Type::type storage_id() const override { return storage_type_->id(); }
 
   DataTypeLayout layout() const override;
 
@@ -114,7 +117,7 @@ class ARROW_EXPORT ExtensionArray : public Array {
   }
 
   /// \brief The physical storage for the extension array
-  std::shared_ptr<Array> storage() const { return storage_; }
+  const std::shared_ptr<Array>& storage() const { return storage_; }
 
  protected:
   void SetData(const std::shared_ptr<ArrayData>& data);

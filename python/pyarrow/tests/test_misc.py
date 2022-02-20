@@ -45,12 +45,25 @@ def test_cpu_count():
         pa.set_cpu_count(n)
 
 
+def test_io_thread_count():
+    n = pa.io_thread_count()
+    assert n > 0
+    try:
+        pa.set_io_thread_count(n + 5)
+        assert pa.io_thread_count() == n + 5
+    finally:
+        pa.set_io_thread_count(n)
+
+
 def test_build_info():
     assert isinstance(pa.cpp_build_info, pa.BuildInfo)
     assert isinstance(pa.cpp_version_info, pa.VersionInfo)
     assert isinstance(pa.cpp_version, str)
     assert isinstance(pa.__version__, str)
     assert pa.cpp_build_info.version_info == pa.cpp_version_info
+
+    assert pa.cpp_build_info.build_type in (
+        'debug', 'release', 'minsizerel', 'relwithdebinfo')
 
     # assert pa.version == pa.__version__  # XXX currently false
 

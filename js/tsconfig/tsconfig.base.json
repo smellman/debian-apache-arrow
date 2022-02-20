@@ -3,13 +3,20 @@
   "include": ["../src/**/*.ts"],
   "compileOnSave": false,
   "compilerOptions": {
+    "baseUrl": "./",
+    "rootDir": "../src",
+    "paths": {
+      "apache-arrow/*": ["src/*"]
+    },
 
     /* Basic stuff */
     "moduleResolution": "node",
     "lib": ["dom", "esnext", "esnext.asynciterable"],
+    "esModuleInterop": true,
 
     /* Control what is emitted */
     "declaration": true,
+    "declarationMap": true,
     "noEmitOnError": true,
     "removeComments": false,
     "noErrorTruncation": true,
@@ -40,6 +47,6 @@
     "allowUnreachableCode": false,
     "noStrictGenericChecks": false,
     "noFallthroughCasesInSwitch": true,
-    "forceConsistentCasingInFileNames": true,
+    "forceConsistentCasingInFileNames": true
   }
 }

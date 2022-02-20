@@ -18,12 +18,14 @@
 #include "./arrow_types.h"
 
 #if defined(ARROW_R_WITH_ARROW)
+
 #include <arrow/array/array_base.h>
 #include <arrow/io/file.h>
 #include <arrow/io/memory.h>
 #include <arrow/ipc/reader.h>
 #include <arrow/ipc/writer.h>
 #include <arrow/type.h>
+#include <arrow/util/byte_size.h>
 #include <arrow/util/key_value_metadata.h>
 
 // [[arrow::export]]
@@ -93,25 +95,8 @@ std::shared_ptr<arrow::Array> RecordBatch__GetColumnByName(
 
 // [[arrow::export]]
 std::shared_ptr<arrow::RecordBatch> RecordBatch__SelectColumns(
-    const std::shared_ptr<arrow::RecordBatch>& batch, cpp11::integers indices) {
-  R_xlen_t n = indices.size();
-  auto nrows = batch->num_rows();
-  auto ncols = batch->num_columns();
-
-  std::vector<std::shared_ptr<arrow::Field>> fields(n);
-  std::vector<std::shared_ptr<arrow::Array>> columns(n);
-
-  for (R_xlen_t i = 0; i < n; i++) {
-    int pos = indices[i];
-    if (pos < 0 || pos > ncols - 1) {
-      cpp11::stop("Invalid column index %d to select columns.", pos);
-    }
-    fields[i] = batch->schema()->field(pos);
-    columns[i] = batch->column(pos);
-  }
-
-  auto schema = std::make_shared<arrow::Schema>(std::move(fields));
-  return arrow::RecordBatch::Make(schema, nrows, columns);
+    const std::shared_ptr<arrow::RecordBatch>& batch, const std::vector<int>& indices) {
+  return ValueOrStop(batch->SelectColumns(indices));
 }
 
 // [[arrow::export]]
@@ -268,7 +253,7 @@ std::shared_ptr<arrow::RecordBatch> RecordBatch__from_arrays__known_schema(
       cpp11::stop("field at index %d has name '%s' != '%s'", j + 1,
                   schema->field(j)->name().c_str(), name.c_str());
     }
-    arrays[j] = arrow::r::vec_to_arrow(x, schema->field(j)->type(), false);
+    arrays[j] = arrow::r::vec_to_arrow_Array(x, schema->field(j)->type(), false);
   };
 
   arrow::r::TraverseDots(lst, num_fields, fill_array);
@@ -285,7 +270,7 @@ arrow::Status CollectRecordBatchArrays(
     SEXP lst, const std::shared_ptr<arrow::Schema>& schema, int num_fields, bool inferred,
     std::vector<std::shared_ptr<arrow::Array>>& arrays) {
   auto extract_one_array = [&arrays, &schema, inferred](int j, SEXP x, cpp11::r_string) {
-    arrays[j] = arrow::r::vec_to_arrow(x, schema->field(j)->type(), inferred);
+    arrays[j] = arrow::r::vec_to_arrow_Array(x, schema->field(j)->type(), inferred);
   };
   arrow::r::TraverseDots(lst, num_fields, extract_one_array);
   return arrow::Status::OK();
@@ -321,6 +306,12 @@ std::shared_ptr<arrow::RecordBatch> RecordBatch__from_arrays(SEXP schema_sxp, SE
   StopIfNotOk(arrow::r::check_consistent_array_size(arrays, &num_rows));
 
   return arrow::RecordBatch::Make(schema, num_rows, arrays);
+}
+
+// [[arrow::export]]
+int64_t RecordBatch__ReferencedBufferSize(
+    const std::shared_ptr<arrow::RecordBatch>& batch) {
+  return ValueOrStop(arrow::util::ReferencedBufferSize(*batch));
 }
 
 #endif

@@ -29,6 +29,18 @@
 namespace arrow {
 namespace util {
 
+namespace {
+
+Status CheckSupportsCompressionLevel(Compression::type type) {
+  if (!Codec::SupportsCompressionLevel(type)) {
+    return Status::Invalid(
+        "The specified codec does not support the compression level parameter");
+  }
+  return Status::OK();
+}
+
+}  // namespace
+
 int Codec::UseDefaultCompressionLevel() { return kUseDefaultCompressionLevel; }
 
 Status Codec::Init() { return Status::OK(); }
@@ -97,10 +109,30 @@ bool Codec::SupportsCompressionLevel(Compression::type codec) {
     case Compression::BROTLI:
     case Compression::ZSTD:
     case Compression::BZ2:
+    case Compression::LZ4_FRAME:
+    case Compression::LZ4:
       return true;
     default:
       return false;
   }
+}
+
+Result<int> Codec::MaximumCompressionLevel(Compression::type codec_type) {
+  RETURN_NOT_OK(CheckSupportsCompressionLevel(codec_type));
+  ARROW_ASSIGN_OR_RAISE(auto codec, Codec::Create(codec_type));
+  return codec->maximum_compression_level();
+}
+
+Result<int> Codec::MinimumCompressionLevel(Compression::type codec_type) {
+  RETURN_NOT_OK(CheckSupportsCompressionLevel(codec_type));
+  ARROW_ASSIGN_OR_RAISE(auto codec, Codec::Create(codec_type));
+  return codec->minimum_compression_level();
+}
+
+Result<int> Codec::DefaultCompressionLevel(Compression::type codec_type) {
+  RETURN_NOT_OK(CheckSupportsCompressionLevel(codec_type));
+  ARROW_ASSIGN_OR_RAISE(auto codec, Codec::Create(codec_type));
+  return codec->default_compression_level();
 }
 
 Result<std::unique_ptr<Codec>> Codec::Create(Compression::type codec_type,
@@ -146,12 +178,12 @@ Result<std::unique_ptr<Codec>> Codec::Create(Compression::type codec_type,
       break;
     case Compression::LZ4:
 #ifdef ARROW_WITH_LZ4
-      codec = internal::MakeLz4RawCodec();
+      codec = internal::MakeLz4RawCodec(compression_level);
 #endif
       break;
     case Compression::LZ4_FRAME:
 #ifdef ARROW_WITH_LZ4
-      codec = internal::MakeLz4FrameCodec();
+      codec = internal::MakeLz4FrameCodec(compression_level);
 #endif
       break;
     case Compression::LZ4_HADOOP:

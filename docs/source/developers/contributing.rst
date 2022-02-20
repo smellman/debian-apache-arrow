@@ -15,6 +15,8 @@
 .. specific language governing permissions and limitations
 .. under the License.
 
+.. highlight:: console
+
 .. _contributing:
 
 ****************************
@@ -77,6 +79,9 @@ Once you are more involved in the project and want to do more on JIRA, such as
 assign yourself an issue, you will need "Contributor" permissions on the
 Apache Arrow JIRA. To get this role, ask on the mailing list for a project
 maintainer's help.
+
+
+.. _jira-tips:
 
 Tips for using JIRA
 +++++++++++++++++++
@@ -189,6 +194,8 @@ direct questions, such as:
 
 If you ask these questions and do not get an answer, it is OK to ask again.
 
+.. _pull_request_and_review:
+
 Pull request and review
 +++++++++++++++++++++++
 
@@ -215,7 +222,7 @@ in the end. To make the review process smooth for everyone, try to
   for maintainers to accept.
 * Add new unit tests for your code.
 * Follow the style guides for the part(s) of the project you're modifying.
-  Some languages (C++, Python, and Rust, for example) run a lint check in
+  Some languages (C++ and Python, for example) run a lint check in
   continuous integration. For all languages, see their respective developer
   documentation and READMEs for style guidance. In general, try to make it look
   as if the codebase has a single author, and emulate any conventions you see,
@@ -237,6 +244,8 @@ will see a message that says ``@user closed this in $COMMIT``. In the commit
 message of that commit, the merge tool adds the pull request description, a
 link back to the pull request, and attribution to the contributor and any
 co-authors.
+
+.. _git_conventions:
 
 Local git conventions
 +++++++++++++++++++++
@@ -310,6 +319,8 @@ to your branch, which they sometimes do to help move a pull request along.
 In addition, the GitHub PR "suggestion" feature can also add commits to
 your branch, so it is possible that your local copy of your branch is missing
 some additions.
+
+.. include:: experimental_repos.rst
 
 Guidance for specific features
 ==============================

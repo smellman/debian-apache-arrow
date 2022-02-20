@@ -26,9 +26,12 @@
 
 #include "arrow/array.h"
 #include "arrow/buffer.h"
+#include "arrow/builder.h"
+#include "arrow/record_batch.h"
+#include "arrow/scalar.h"
+#include "arrow/testing/builder.h"
 #include "arrow/testing/gtest_util.h"
 #include "arrow/type.h"
-#include "arrow/type_fwd.h"
 #include "arrow/type_traits.h"
 #include "arrow/util/bit_util.h"
 
@@ -95,88 +98,94 @@ std::shared_ptr<arrow::Array> ConstantArrayGenerator::String(int64_t size,
   return ConstantArray<StringType>(size, value);
 }
 
-struct ScalarVectorToArrayImpl {
-  template <typename T, typename AppendScalar,
-            typename BuilderType = typename TypeTraits<T>::BuilderType,
-            typename ScalarType = typename TypeTraits<T>::ScalarType>
-  Status UseBuilder(const AppendScalar& append) {
-    BuilderType builder(type_, default_memory_pool());
-    for (const auto& s : scalars_) {
-      if (s->is_valid) {
-        RETURN_NOT_OK(append(internal::checked_cast<const ScalarType&>(*s), &builder));
-      } else {
-        RETURN_NOT_OK(builder.AppendNull());
+std::shared_ptr<arrow::Array> ConstantArrayGenerator::Zeroes(
+    int64_t size, const std::shared_ptr<DataType>& type) {
+  switch (type->id()) {
+    case Type::NA:
+      return std::make_shared<NullArray>(size);
+    case Type::BOOL:
+      return Boolean(size);
+    case Type::UINT8:
+      return UInt8(size);
+    case Type::INT8:
+      return Int8(size);
+    case Type::UINT16:
+      return UInt16(size);
+    case Type::INT16:
+      return Int16(size);
+    case Type::UINT32:
+      return UInt32(size);
+    case Type::INT32:
+      return Int32(size);
+    case Type::UINT64:
+      return UInt64(size);
+    case Type::INT64:
+      return Int64(size);
+    case Type::TIME64:
+    case Type::DATE64:
+    case Type::TIMESTAMP: {
+      EXPECT_OK_AND_ASSIGN(auto viewed, Int64(size)->View(type));
+      return viewed;
+    }
+    case Type::INTERVAL_DAY_TIME:
+    case Type::INTERVAL_MONTHS:
+    case Type::TIME32:
+    case Type::DATE32: {
+      EXPECT_OK_AND_ASSIGN(auto viewed, Int32(size)->View(type));
+      return viewed;
+    }
+    case Type::FLOAT:
+      return Float32(size);
+    case Type::DOUBLE:
+      return Float64(size);
+    case Type::STRING:
+      return String(size);
+    case Type::STRUCT: {
+      ArrayVector children;
+      children.reserve(type->num_fields());
+      for (const auto& field : type->fields()) {
+        children.push_back(Zeroes(size, field->type()));
       }
+      return std::make_shared<StructArray>(type, size, children);
     }
-    return builder.FinishInternal(&data_);
+    default:
+      ADD_FAILURE() << "ConstantArrayGenerator::Zeroes is not implemented for " << *type;
+      return nullptr;
+  }
+}
+
+std::shared_ptr<RecordBatch> ConstantArrayGenerator::Zeroes(
+    int64_t size, const std::shared_ptr<Schema>& schema) {
+  std::vector<std::shared_ptr<Array>> arrays;
+
+  for (const auto& field : schema->fields()) {
+    arrays.emplace_back(Zeroes(size, field->type()));
   }
 
-  struct AppendValue {
-    template <typename BuilderType, typename ScalarType>
-    Status operator()(const ScalarType& s, BuilderType* builder) const {
-      return builder->Append(s.value);
-    }
-  };
+  return RecordBatch::Make(schema, size, arrays);
+}
 
-  struct AppendBuffer {
-    template <typename BuilderType, typename ScalarType>
-    Status operator()(const ScalarType& s, BuilderType* builder) const {
-      const Buffer& buffer = *s.value;
-      return builder->Append(util::string_view{buffer});
-    }
-  };
+std::shared_ptr<RecordBatchReader> ConstantArrayGenerator::Repeat(
+    int64_t n_batch, const std::shared_ptr<RecordBatch> batch) {
+  std::vector<std::shared_ptr<RecordBatch>> batches(static_cast<size_t>(n_batch), batch);
+  return *RecordBatchReader::Make(batches);
+}
 
-  template <typename T>
-  enable_if_primitive_ctype<T, Status> Visit(const T&) {
-    return UseBuilder<T>(AppendValue{});
-  }
-
-  template <typename T>
-  enable_if_has_string_view<T, Status> Visit(const T&) {
-    return UseBuilder<T>(AppendBuffer{});
-  }
-
-  Status Visit(const StructType& type) {
-    data_ = ArrayData::Make(type_, static_cast<int64_t>(scalars_.size()),
-                            {/*null_bitmap=*/nullptr});
-    data_->child_data.resize(type_->num_fields());
-
-    ScalarVector field_scalars(scalars_.size());
-
-    for (int field_index = 0; field_index < type.num_fields(); ++field_index) {
-      for (size_t i = 0; i < scalars_.size(); ++i) {
-        field_scalars[i] =
-            internal::checked_cast<StructScalar*>(scalars_[i].get())->value[field_index];
-      }
-
-      ARROW_ASSIGN_OR_RAISE(data_->child_data[field_index],
-                            ScalarVectorToArrayImpl{}.Convert(field_scalars));
-    }
-    return Status::OK();
-  }
-
-  Status Visit(const DataType& type) {
-    return Status::NotImplemented("ScalarVectorToArray for type ", type);
-  }
-
-  Result<std::shared_ptr<ArrayData>> Convert(const ScalarVector& scalars) && {
-    if (scalars.size() == 0) {
-      return Status::NotImplemented("ScalarVectorToArray with no scalars");
-    }
-    scalars_ = std::move(scalars);
-    type_ = scalars_[0]->type;
-    RETURN_NOT_OK(VisitTypeInline(*type_, this));
-    return std::move(data_);
-  }
-
-  std::shared_ptr<DataType> type_;
-  ScalarVector scalars_;
-  std::shared_ptr<ArrayData> data_;
-};
+std::shared_ptr<RecordBatchReader> ConstantArrayGenerator::Zeroes(
+    int64_t n_batch, int64_t batch_size, const std::shared_ptr<Schema>& schema) {
+  return Repeat(n_batch, Zeroes(batch_size, schema));
+}
 
 Result<std::shared_ptr<Array>> ScalarVectorToArray(const ScalarVector& scalars) {
-  ARROW_ASSIGN_OR_RAISE(auto data, ScalarVectorToArrayImpl{}.Convert(scalars));
-  return MakeArray(std::move(data));
+  if (scalars.empty()) {
+    return Status::NotImplemented("ScalarVectorToArray with no scalars");
+  }
+  std::unique_ptr<arrow::ArrayBuilder> builder;
+  RETURN_NOT_OK(MakeBuilder(default_memory_pool(), scalars[0]->type, &builder));
+  RETURN_NOT_OK(builder->AppendScalars(scalars));
+  std::shared_ptr<Array> out;
+  RETURN_NOT_OK(builder->Finish(&out));
+  return out;
 }
 
 }  // namespace arrow

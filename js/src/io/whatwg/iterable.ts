@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { toUint8Array } from '../../util/buffer';
-import { ReadableDOMStreamOptions } from '../../io/interfaces';
-import { isIterable, isAsyncIterable } from '../../util/compat';
+import { toUint8Array } from '../../util/buffer.js';
+import { ReadableDOMStreamOptions } from '../../io/interfaces.js';
+import { isIterable, isAsyncIterable } from '../../util/compat.js';
 
 /** @ignore */
 type SourceIterator<T> = Generator<T, void, number | null>;
@@ -36,14 +36,14 @@ export function toDOMStream<T>(source: Iterable<T> | AsyncIterable<T>, options?:
 function iterableAsReadableDOMStream<T>(source: Iterable<T>, options?: ReadableDOMStreamOptions) {
 
     let it: SourceIterator<T> | null = null;
-    const bm = (options && options.type === 'bytes') || false;
-    const hwm = options && options.highWaterMark || (2 ** 24);
+    const bm = (options?.type === 'bytes') || false;
+    const hwm = options?.highWaterMark || (2 ** 24);
 
     return new ReadableStream<T>({
         ...options as any,
         start(controller) { next(controller, it || (it = source[Symbol.iterator]() as SourceIterator<T>)); },
         pull(controller) { it ? (next(controller, it)) : controller.close(); },
-        cancel() { (it && (it.return && it.return()) || true) && (it = null); }
+        cancel() { (it?.return && it.return() || true) && (it = null); }
     }, { highWaterMark: bm ? hwm : undefined, ...options });
 
     function next(controller: ReadableStreamDefaultController<T>, it: SourceIterator<T>) {
@@ -53,7 +53,7 @@ function iterableAsReadableDOMStream<T>(source: Iterable<T>, options?: ReadableD
         while (!(r = it.next(bm ? size : null)).done) {
             if (ArrayBuffer.isView(r.value) && (buf = toUint8Array(r.value))) {
                 size != null && bm && (size = size - buf.byteLength + 1);
-                r.value = <any> buf;
+                r.value = <any>buf;
             }
             controller.enqueue(r.value);
             if (size != null && --size <= 0) { return; }
@@ -66,14 +66,14 @@ function iterableAsReadableDOMStream<T>(source: Iterable<T>, options?: ReadableD
 function asyncIterableAsReadableDOMStream<T>(source: AsyncIterable<T>, options?: ReadableDOMStreamOptions) {
 
     let it: AsyncSourceIterator<T> | null = null;
-    const bm = (options && options.type === 'bytes') || false;
-    const hwm = options && options.highWaterMark || (2 ** 24);
+    const bm = (options?.type === 'bytes') || false;
+    const hwm = options?.highWaterMark || (2 ** 24);
 
     return new ReadableStream<T>({
         ...options as any,
         async start(controller) { await next(controller, it || (it = source[Symbol.asyncIterator]() as AsyncSourceIterator<T>)); },
         async pull(controller) { it ? (await next(controller, it)) : controller.close(); },
-        async cancel() { (it && (it.return && await it.return()) || true) && (it = null); },
+        async cancel() { (it?.return && await it.return() || true) && (it = null); },
     }, { highWaterMark: bm ? hwm : undefined, ...options });
 
     async function next(controller: ReadableStreamDefaultController<T>, it: AsyncSourceIterator<T>) {
@@ -83,7 +83,7 @@ function asyncIterableAsReadableDOMStream<T>(source: AsyncIterable<T>, options?:
         while (!(r = await it.next(bm ? size : null)).done) {
             if (ArrayBuffer.isView(r.value) && (buf = toUint8Array(r.value))) {
                 size != null && bm && (size = size - buf.byteLength + 1);
-                r.value = <any> buf;
+                r.value = <any>buf;
             }
             controller.enqueue(r.value);
             if (size != null && --size <= 0) { return; }

@@ -51,6 +51,7 @@ echo "=== (${PYTHON_VERSION}) Building Arrow C++ libraries ==="
 : ${ARROW_DATASET:=ON}
 : ${ARROW_FLIGHT:=ON}
 : ${ARROW_GANDIVA:=OFF}
+: ${ARROW_GCS:=OFF}
 : ${ARROW_HDFS:=ON}
 : ${ARROW_JEMALLOC:=ON}
 : ${ARROW_MIMALLOC:=ON}
@@ -68,11 +69,20 @@ echo "=== (${PYTHON_VERSION}) Building Arrow C++ libraries ==="
 : ${CMAKE_BUILD_TYPE:=release}
 : ${CMAKE_UNITY_BUILD:=ON}
 : ${CMAKE_GENERATOR:=Ninja}
+: ${VCPKG_ROOT:=/opt/vcpkg}
 : ${VCPKG_FEATURE_FLAGS:=-manifests}
 : ${VCPKG_TARGET_TRIPLET:=${VCPKG_DEFAULT_TRIPLET:-x64-linux-static-${CMAKE_BUILD_TYPE}}}
 
+if [[ "$(uname -m)" == arm* ]] || [[ "$(uname -m)" == aarch* ]]; then
+    # Build jemalloc --with-lg-page=16 in order to make the wheel work on both
+    # 4k and 64k page arm64 systems. For more context see
+    # https://github.com/apache/arrow/issues/10929
+    export ARROW_EXTRA_CMAKE_FLAGS="-DARROW_JEMALLOC_LG_PAGE=16"
+fi
+
 mkdir /tmp/arrow-build
 pushd /tmp/arrow-build
+
 cmake \
     -DARROW_BROTLI_USE_SHARED=OFF \
     -DARROW_BUILD_SHARED=ON \
@@ -81,8 +91,9 @@ cmake \
     -DARROW_DATASET=${ARROW_DATASET} \
     -DARROW_DEPENDENCY_SOURCE="VCPKG" \
     -DARROW_DEPENDENCY_USE_SHARED=OFF \
-    -DARROW_FLIGHT==${ARROW_FLIGHT} \
+    -DARROW_FLIGHT=${ARROW_FLIGHT} \
     -DARROW_GANDIVA=${ARROW_GANDIVA} \
+    -DARROW_GCS=${ARROW_GCS} \
     -DARROW_HDFS=${ARROW_HDFS} \
     -DARROW_JEMALLOC=${ARROW_JEMALLOC} \
     -DARROW_MIMALLOC=${ARROW_MIMALLOC} \
@@ -102,13 +113,17 @@ cmake \
     -DARROW_WITH_SNAPPY=${ARROW_WITH_SNAPPY} \
     -DARROW_WITH_ZLIB=${ARROW_WITH_ZLIB} \
     -DARROW_WITH_ZSTD=${ARROW_WITH_ZSTD} \
+    -DAWSSDK_SOURCE=BUNDLED \
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_INSTALL_PREFIX=/tmp/arrow-dist \
     -DCMAKE_UNITY_BUILD=${CMAKE_UNITY_BUILD} \
     -DOPENSSL_USE_STATIC_LIBS=ON \
+    -DORC_PROTOBUF_EXECUTABLE=${VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}/tools/protobuf/protoc \
+    -DORC_SOURCE=BUNDLED \
     -DVCPKG_MANIFEST_MODE=OFF \
     -DVCPKG_TARGET_TRIPLET=${VCPKG_TARGET_TRIPLET} \
+    ${ARROW_EXTRA_CMAKE_FLAGS} \
     -G ${CMAKE_GENERATOR} \
     /arrow/cpp
 cmake --build . --target install

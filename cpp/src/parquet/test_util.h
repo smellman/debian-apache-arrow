@@ -179,6 +179,12 @@ static void InitDictValues(int num_values, int num_dicts, std::vector<T>& values
   }
 }
 
+template <>
+inline void InitDictValues<bool>(int num_values, int num_dicts, std::vector<bool>& values,
+                                 std::vector<uint8_t>& buffer) {
+  // No op for bool
+}
+
 class MockPageReader : public PageReader {
  public:
   explicit MockPageReader(const std::vector<std::shared_ptr<Page>>& pages)
@@ -274,8 +280,8 @@ class DataPageBuilder {
       ParquetException::NYI("only rle encoding currently implemented");
     }
 
-    // TODO: compute a more precise maximum size for the encoded levels
-    std::vector<uint8_t> encode_buffer(levels.size() * 2);
+    std::vector<uint8_t> encode_buffer(LevelEncoder::MaxBufferSize(
+        Encoding::RLE, max_level, static_cast<int>(levels.size())));
 
     // We encode into separate memory from the output stream because the
     // RLE-encoded bytes have to be preceded in the stream by their absolute
@@ -332,7 +338,7 @@ static std::shared_ptr<DataPageV1> MakeDataPage(
 
   if (encoding == Encoding::PLAIN) {
     page_builder.AppendValues(d, values, encoding);
-    num_values = page_builder.num_values();
+    num_values = std::max(page_builder.num_values(), num_vals);
   } else {  // DICTIONARY PAGES
     PARQUET_THROW_NOT_OK(page_stream->Write(indices, indices_size));
     num_values = std::max(page_builder.num_values(), num_vals);
@@ -563,7 +569,7 @@ template <>
 void inline InitValues<bool>(int num_values, std::vector<bool>& values,
                              std::vector<uint8_t>& buffer) {
   values = {};
-  ::arrow::random_is_valid(num_values, 1., &values,
+  ::arrow::random_is_valid(num_values, 0.5, &values,
                            static_cast<int>(::arrow::random_seed()));
 }
 

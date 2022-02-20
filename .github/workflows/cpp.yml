@@ -37,6 +37,10 @@ on:
       - 'cpp/**'
       - 'format/Flight.proto'
 
+concurrency:
+  group: ${{ github.repository }}-${{ github.head_ref || github.sha }}-${{ github.workflow }}
+  cancel-in-progress: true
+
 env:
   ARROW_ENABLE_TIMING_TESTS: OFF
   DOCKER_VOLUME_PREFIX: ".docker/"
@@ -44,11 +48,11 @@ env:
   ARCHERY_DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
 
 jobs:
-
   docker:
     name: ${{ matrix.title }}
     runs-on: ubuntu-latest
     if: ${{ !contains(github.event.pull_request.title, 'WIP') }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -65,10 +69,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Fetch Submodules and Tags
-        run: ci/scripts/util_checkout.sh
-      - name: Free Up Disk Space
-        run: ci/scripts/util_cleanup.sh
+          submodules: recursive
       - name: Cache Docker Volumes
         uses: actions/cache@v2
         with:
@@ -91,84 +92,11 @@ jobs:
         continue-on-error: true
         run: archery docker push ${{ matrix.image }}
 
-  docker-arm:
-    # NOTE: this job is specific for self-hosted runners
-    # CACHING: don't use the cache plugin because of various permission
-    #          issues and keep the cached docker volumes permanently on the
-    #          host
-    # PYTHON: no distributions are built for arm machines by the github
-    #         actions team, so python>3.6 must be preinstalled on the self
-    #         hosted machines
-    name: ${{ matrix.title }}
-    runs-on: ${{ matrix.runner }}
-    # TODO(kszucs): re-enable once the self-hosted workers are properly
-    # registered to github
-    if: false && github.event_name == 'push'
-    defaults:
-      # To use certain environment variables set by .bashrc, an interactive
-      # bash shell must be used
-      run:
-        shell: bash -i {0}
-    strategy:
-      fail-fast: false
-      matrix:
-        name:
-          - arm32v7-debian-10-cpp
-          - arm64v8-ubuntu-20.04-cpp
-        include:
-          - name: arm32v7-debian-10-cpp
-            debian: 10
-            title: ARM32v7 Debian 10 C++
-            image: |
-              -e CPP_MAKE_PARALLELISM=2 \
-              -e CXXFLAGS=-Wno-psabi \
-              -e ARROW_PARQUET=OFF \
-              -e ARROW_FLIGHT=OFF \
-              -e ARROW_GANDIVA=OFF \
-              -e ARROW_ORC=OFF \
-              -e CMAKE_ARGS=-DARROW_CPU_FLAG=armv7 \
-              debian-cpp
-            arch: 'arm32v7'
-            runner: [self-hosted, linux, ARM]
-          - name: arm64v8-ubuntu-20.04-cpp
-            ubuntu: 20.04
-            title: ARM64v8 Ubuntu 20.04 C++
-            image: |
-              -e CPP_MAKE_PARALLELISM=1 \
-              -e ARROW_PARQUET=OFF \
-              ubuntu-cpp
-            arch: 'arm64v8'
-            runner: [self-hosted, linux, ARM64]
-    env:
-      # the defaults here should correspond to the values in .env
-      ARCH: ${{ matrix.arch || 'arm64v8' }}
-      DEBIAN: ${{ matrix.debian || 10 }}
-      FEDORA: ${{ matrix.fedora || 32 }}
-      UBUNTU: ${{ matrix.ubuntu || 18.04 }}
-      LLVM: 8
-    steps:
-      - name: Checkout Arrow
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Fetch Submodules and Tags
-        run: ci/scripts/util_checkout.sh
-      - name: Setup Archery
-        run: pip install -U -e dev/archery[docker]
-      - name: Execute Docker Build
-        # parallelism is reduced because the ARM builders are low on memory
-        run: |
-          ulimit -c unlimited
-          archery docker run ${{ matrix.image }}
-      - name: Docker Push
-        if: success() && github.event_name == 'push' && github.repository == 'apache/arrow'
-        continue-on-error: true
-        run: archery docker push ${{ matrix.image }}
-
   build-example:
     name: C++ Minimal Build Example
     runs-on: ubuntu-latest
     if: ${{ !contains(github.event.pull_request.title, 'WIP') }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
     steps:
@@ -176,7 +104,12 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Run
+          submodules: recursive
+      - name: Check CMake presets
+        run: |
+          cd cpp
+          cmake --list-presets
+      - name: Run minimal example
         run: |
           cd cpp/examples/minimal_build
           docker-compose run --rm minimal
@@ -185,6 +118,7 @@ jobs:
     name: AMD64 MacOS 10.15 C++
     runs-on: macos-latest
     if: ${{ !contains(github.event.pull_request.title, 'WIP') }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
     env:
@@ -211,16 +145,26 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Fetch Submodules and Tags
-        shell: bash
-        run: ci/scripts/util_checkout.sh
+          submodules: recursive
       - name: Install Dependencies
         shell: bash
         run: |
           rm -f /usr/local/bin/2to3
           brew update --preinstall
-          brew unlink gcc@8 gcc@9
           brew bundle --file=cpp/Brewfile
+      - name: Setup ccache
+        run: |
+          ci/scripts/ccache_setup.sh
+      - name: ccache info
+        id: ccache-info
+        run: |
+          echo "::set-output name=cache-dir::$(ccache --get-config cache_dir)"
+      - name: Cache ccache
+        uses: actions/cache@v2
+        with:
+          path: ${{ steps.ccache-info.outputs.cache-dir }}
+          key: cpp-ccache-macos-${{ hashFiles('cpp/**') }}
+          restore-keys: cpp-ccache-macos-
       - name: Build
         shell: bash
         run: ci/scripts/cpp_build.sh $(pwd) $(pwd)/build
@@ -233,9 +177,10 @@ jobs:
           ci/scripts/cpp_test.sh $(pwd) $(pwd)/build
 
   windows:
-    name: AMD64 ${{ matrix.name }} C++
+    name: AMD64 ${{ matrix.name }} C++17
     runs-on: ${{ matrix.os }}
     if: ${{ !contains(github.event.pull_request.title, 'WIP') }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -251,6 +196,7 @@ jobs:
       ARROW_BUILD_SHARED: ON
       ARROW_BUILD_STATIC: OFF
       ARROW_BUILD_TESTS: ON
+      ARROW_CXXFLAGS: "/std:c++17"
       ARROW_DATASET: ON
       ARROW_FLIGHT: OFF
       ARROW_HDFS: ON
@@ -272,7 +218,7 @@ jobs:
       CMAKE_INSTALL_LIBDIR: bin
       CMAKE_INSTALL_PREFIX: /usr
       CMAKE_UNITY_BUILD: ON
-      NPROC: 2
+      NPROC: 3
     steps:
       - name: Disable Crash Dialogs
         run: |
@@ -290,13 +236,10 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Fetch Submodules and Tags
-        shell: bash
-        run: ci/scripts/util_checkout.sh
+          submodules: recursive
       - name: Build
         shell: bash
-        run: |
-          ci/scripts/cpp_build.sh $(pwd) $(pwd)/build
+        run: ci/scripts/cpp_build.sh $(pwd) $(pwd)/build
       - name: Test
         shell: bash
         run: ci/scripts/cpp_test.sh $(pwd) $(pwd)/build
@@ -305,6 +248,7 @@ jobs:
     name: AMD64 Windows MinGW ${{ matrix.mingw-n-bits }} C++
     runs-on: windows-latest
     if: ${{ !contains(github.event.pull_request.title, 'WIP') }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -353,17 +297,14 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Fetch Submodules and Tags
-        shell: bash
-        run: ci/scripts/util_checkout.sh
+          submodules: recursive
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW${{ matrix.mingw-n-bits }}
           update: true
       - name: Setup MSYS2
         shell: msys2 {0}
-        run: |
-          ci/scripts/msys2_setup.sh cpp
+        run: ci/scripts/msys2_setup.sh cpp
       - name: Cache ccache
         uses: actions/cache@v2
         with:

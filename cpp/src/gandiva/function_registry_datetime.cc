@@ -21,21 +21,33 @@
 
 namespace gandiva {
 
-#define DATE_EXTRACTION_TRUNCATION_FNS(INNER, name)                              \
-  DATE_TYPES(INNER, name##Millennium, {}), DATE_TYPES(INNER, name##Century, {}), \
-      DATE_TYPES(INNER, name##Decade, {}), DATE_TYPES(INNER, name##Year, {}),    \
-      DATE_TYPES(INNER, name##Quarter, {}), DATE_TYPES(INNER, name##Month, {}),  \
-      DATE_TYPES(INNER, name##Week, {}), DATE_TYPES(INNER, name##Day, {}),       \
-      DATE_TYPES(INNER, name##Hour, {}), DATE_TYPES(INNER, name##Minute, {}),    \
-      DATE_TYPES(INNER, name##Second, {})
+#define DATE_EXTRACTION_TRUNCATION_FNS(INNER, name)                                    \
+  DATE_TYPES(INNER, name##Millennium, {}), DATE_TYPES(INNER, name##Century, {}),       \
+      DATE_TYPES(INNER, name##Decade, {}), DATE_TYPES(INNER, name##Year, {"year"}),    \
+      DATE_TYPES(INNER, name##Quarter, {}), DATE_TYPES(INNER, name##Month, {"month"}), \
+      DATE_TYPES(INNER, name##Week, ({"weekofyear", "yearweek"})),                     \
+      DATE_TYPES(INNER, name##Day, ({"day", "dayofmonth"})),                           \
+      DATE_TYPES(INNER, name##Hour, {"hour"}),                                         \
+      DATE_TYPES(INNER, name##Minute, {"minute"}),                                     \
+      DATE_TYPES(INNER, name##Second, {"second"})
 
-#define TIME_EXTRACTION_FNS(name)                              \
-  TIME_TYPES(EXTRACT_SAFE_NULL_IF_NULL, name##Hour, {}),       \
-      TIME_TYPES(EXTRACT_SAFE_NULL_IF_NULL, name##Minute, {}), \
-      TIME_TYPES(EXTRACT_SAFE_NULL_IF_NULL, name##Second, {})
+#define TO_TIMESTAMP_SAFE_NULL_IF_NULL(NAME, ALIASES, TYPE)                       \
+  NativeFunction(#NAME, std::vector<std::string> ALIASES, DataTypeVector{TYPE()}, \
+                 timestamp(), kResultNullIfNull, ARROW_STRINGIFY(NAME##_##TYPE))
+
+#define TO_TIME_SAFE_NULL_IF_NULL(NAME, ALIASES, TYPE)                            \
+  NativeFunction(#NAME, std::vector<std::string> ALIASES, DataTypeVector{TYPE()}, \
+                 time32(), kResultNullIfNull, ARROW_STRINGIFY(NAME##_##TYPE))
+
+#define TIME_EXTRACTION_FNS(name)                                      \
+  TIME_TYPES(EXTRACT_SAFE_NULL_IF_NULL, name##Hour, {"hour"}),         \
+      TIME_TYPES(EXTRACT_SAFE_NULL_IF_NULL, name##Minute, {"minute"}), \
+      TIME_TYPES(EXTRACT_SAFE_NULL_IF_NULL, name##Second, {"second"})
 
 std::vector<NativeFunction> GetDateTimeFunctionRegistry() {
   static std::vector<NativeFunction> date_time_fn_registry_ = {
+      UNARY_SAFE_NULL_NEVER_BOOL(isnull, {}, day_time_interval),
+      UNARY_SAFE_NULL_NEVER_BOOL(isnull, {}, month_interval),
       DATE_EXTRACTION_TRUNCATION_FNS(EXTRACT_SAFE_NULL_IF_NULL, extract),
       DATE_EXTRACTION_TRUNCATION_FNS(TRUNCATE_SAFE_NULL_IF_NULL, date_trunc_),
 
@@ -77,16 +89,51 @@ std::vector<NativeFunction> GetDateTimeFunctionRegistry() {
       NativeFunction("castDATE", {"to_date"}, DataTypeVector{timestamp()}, date64(),
                      kResultNullIfNull, "castDATE_timestamp"),
 
+      NativeFunction("castTIME", {}, DataTypeVector{utf8()}, time32(), kResultNullIfNull,
+                     "castTIME_utf8",
+                     NativeFunction::kNeedsContext | NativeFunction::kCanReturnErrors),
+
       NativeFunction("castTIME", {}, DataTypeVector{timestamp()}, time32(),
                      kResultNullIfNull, "castTIME_timestamp"),
+
+      NativeFunction("castTIME", {}, DataTypeVector{int32()}, time32(), kResultNullIfNull,
+                     "castTIME_int32"),
 
       NativeFunction("castBIGINT", {}, DataTypeVector{day_time_interval()}, int64(),
                      kResultNullIfNull, "castBIGINT_daytimeinterval"),
 
+      NativeFunction("castINT", {"castNULLABLEINT"}, DataTypeVector{month_interval()},
+                     int32(), kResultNullIfNull, "castINT_year_interval",
+                     NativeFunction::kCanReturnErrors),
+
+      NativeFunction("castBIGINT", {"castNULLABLEBIGINT"},
+                     DataTypeVector{month_interval()}, int64(), kResultNullIfNull,
+                     "castBIGINT_year_interval", NativeFunction::kCanReturnErrors),
+
+      NativeFunction("castNULLABLEINTERVALYEAR", {"castINTERVALYEAR"},
+                     DataTypeVector{int32()}, month_interval(), kResultNullIfNull,
+                     "castNULLABLEINTERVALYEAR_int32",
+                     NativeFunction::kNeedsContext | NativeFunction::kCanReturnErrors),
+
+      NativeFunction("castNULLABLEINTERVALYEAR", {"castINTERVALYEAR"},
+                     DataTypeVector{int64()}, month_interval(), kResultNullIfNull,
+                     "castNULLABLEINTERVALYEAR_int64",
+                     NativeFunction::kNeedsContext | NativeFunction::kCanReturnErrors),
+
+      NativeFunction("castNULLABLEINTERVALDAY", {"castINTERVALDAY"},
+                     DataTypeVector{int32()}, day_time_interval(), kResultNullIfNull,
+                     "castNULLABLEINTERVALDAY_int32"),
+
+      NativeFunction("castNULLABLEINTERVALDAY", {"castINTERVALDAY"},
+                     DataTypeVector{int64()}, day_time_interval(), kResultNullIfNull,
+                     "castNULLABLEINTERVALDAY_int64"),
+
       NativeFunction("extractDay", {}, DataTypeVector{day_time_interval()}, int64(),
                      kResultNullIfNull, "extractDay_daytimeinterval"),
 
-      DATE_TYPES(LAST_DAY_SAFE_NULL_IF_NULL, last_day, {})};
+      DATE_TYPES(LAST_DAY_SAFE_NULL_IF_NULL, last_day, {}),
+      BASE_NUMERIC_TYPES(TO_TIME_SAFE_NULL_IF_NULL, to_time, {}),
+      BASE_NUMERIC_TYPES(TO_TIMESTAMP_SAFE_NULL_IF_NULL, to_timestamp, {})};
 
   return date_time_fn_registry_;
 }

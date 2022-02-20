@@ -32,6 +32,39 @@ such topics as:
 * Reading and writing file formats (like CSV, Apache ORC, and Apache Parquet)
 * In-memory analytics and query processing
 
+**To learn how to use Arrow refer to the documentation specific to your
+target environment.**
+
+.. _toc.usage:
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Supported Environments
+
+   C/GLib <c_glib/index>
+   C++ <cpp/index>
+   C# <https://github.com/apache/arrow/blob/master/csharp/README.md>
+   Go <https://pkg.go.dev/github.com/apache/arrow/go>
+   Java <java/index>
+   JavaScript <js/index>
+   Julia <https://github.com/apache/arrow/blob/master/julia/Arrow/README.md>
+   MATLAB <https://github.com/apache/arrow/blob/master/matlab/README.md>
+   Python <python/index>
+   R <r/index>
+   Ruby <https://github.com/apache/arrow/blob/master/ruby/README.md>
+   Rust <https://docs.rs/crate/arrow/>
+   status
+
+.. _toc.cookbook:
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Cookbooks
+
+   C++ <https://arrow.apache.org/cookbook/cpp/>
+   Python <https://arrow.apache.org/cookbook/py/>
+   R <https://arrow.apache.org/cookbook/r/>
+
 .. _toc.columnar:
 
 .. toctree::
@@ -46,26 +79,6 @@ such topics as:
    format/CStreamInterface
    format/Other
 
-.. _toc.usage:
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Libraries
-
-   status
-   C/GLib <https://arrow.apache.org/docs/c_glib/>
-   C++ <cpp/index>
-   C# <https://github.com/apache/arrow/blob/master/csharp/README.md>
-   Go <https://godoc.org/github.com/apache/arrow/go/arrow>
-   Java <java/index>
-   JavaScript <https://arrow.apache.org/docs/js/>
-   Julia <https://github.com/apache/arrow/blob/master/julia/Arrow/README.md>
-   MATLAB <https://github.com/apache/arrow/blob/master/matlab/README.md>
-   Python <python/index>
-   R <https://arrow.apache.org/docs/r/>
-   Ruby <https://github.com/apache/arrow/blob/master/ruby/README.md>
-   Rust <https://docs.rs/crate/arrow/>
-
 .. _toc.development:
 
 .. toctree::
@@ -73,10 +86,11 @@ such topics as:
    :caption: Development
 
    developers/contributing
+   developers/guide/index
+   developers/reviewing
    developers/cpp/index
    developers/python
-   developers/archery
-   developers/crossbow
-   developers/docker
+   developers/continuous_integration/index
    developers/benchmarks
    developers/documentation
+   developers/computeir

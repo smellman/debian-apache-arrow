@@ -1,6 +1,6 @@
 {
   "name": "arrow",
-  "version-string": "4.0.0",
+  "version-string": "7.0.0",
   "dependencies": [
     "abseil",
     {
@@ -15,7 +15,11 @@
       ]
     },
     "benchmark",
-    "boost",
+    "boost-filesystem",
+    "boost-multiprecision",
+    "boost-process",
+    "boost-system",
+    "boost-crc",
     "brotli",
     "bzip2",
     "c-ares",
@@ -23,6 +27,14 @@
     "flatbuffers",
     "gflags",
     "glog",
+    {
+      "name":"google-cloud-cpp",
+      "version>=": "1.32.1",
+      "default-features": false,
+      "features": [
+        "storage"
+      ]
+    },
     "grpc",
     "gtest",
     "lz4",
@@ -32,9 +44,14 @@
     "rapidjson",
     "re2",
     "snappy",
+    "sqlite3",
     "thrift",
     "utf8proc",
     "zlib",
     "zstd"
-  ]
+  ],
+  "overrides": [
+    { "name": "gtest", "version": "1.10.0", "port-version": 4 }
+  ],
+  "builtin-baseline": "b5865bfeba430cd44063fc54a45a8861195a715f"
 }

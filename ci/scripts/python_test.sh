@@ -25,8 +25,9 @@ export ARROW_SOURCE_DIR=${arrow_dir}
 export ARROW_TEST_DATA=${arrow_dir}/testing/data
 export PARQUET_TEST_DATA=${arrow_dir}/cpp/submodules/parquet-testing/data
 export LD_LIBRARY_PATH=${ARROW_HOME}/lib:${LD_LIBRARY_PATH}
+export ARROW_GDB_SCRIPT=${arrow_dir}/cpp/gdb_arrow.py
 
 # Enable some checks inside Python itself
 export PYTHONDEVMODE=1
 
-pytest -r s ${PYTEST_ARGS} --pyargs pyarrow
+pytest -r s -v ${PYTEST_ARGS} --pyargs pyarrow

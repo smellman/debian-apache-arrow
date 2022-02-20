@@ -101,6 +101,24 @@ namespace Apache.Arrow.Tests
                 new List<string> { "444", null, "555", "666" },
                 ConvertStringArrayToList(list.GetSlicedValues(3) as StringArray));
 
+            Assert.Throws<ArgumentOutOfRangeException>(() => list.GetValueLength(-1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => list.GetValueLength(4));
+
+            listBuilder.Resize(2);
+            var truncatedList = listBuilder.Build();
+
+            Assert.Equal(
+                new List<string> { "22", "33", "444", null, "555", "666" },
+                ConvertStringArrayToList(truncatedList.GetSlicedValues(2) as StringArray));
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => truncatedList.GetSlicedValues(-1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => truncatedList.GetSlicedValues(3));
+
+            listBuilder.Clear();
+            var emptyList = listBuilder.Build();
+
+            Assert.Equal(0, emptyList.Length);
+
             List<string> ConvertStringArrayToList(StringArray array)
             {
                 var length = array.Length;
@@ -111,6 +129,13 @@ namespace Apache.Arrow.Tests
                 }
                 return resultList;
             }
+        }
+
+        [Fact]
+        public void ListArrayBuilderValidityBuffer()
+        {
+            ListArray listArray = new ListArray.Builder(Int64Type.Default).Append().AppendNull().Build();   
+            Assert.False(listArray.IsValid(2));
         }
 
         [Fact]
@@ -170,8 +195,29 @@ namespace Apache.Arrow.Tests
                     .Build();
 
                 Assert.Equal(1, array.Length);
-                Assert.NotNull(array.GetTimestamp(0));
-                Assert.Equal(now.Truncate(TimeSpan.FromTicks(100)), array.GetTimestamp(0).Value);
+                var value = array.GetTimestamp(0);
+                Assert.NotNull(value);
+                Assert.Equal(now, value.Value);
+
+                timestampType = new TimestampType(TimeUnit.Microsecond, TimeZoneInfo.Local);
+                array = new TimestampArray.Builder(timestampType)
+                    .Append(now)
+                    .Build();
+
+                Assert.Equal(1, array.Length);
+                value = array.GetTimestamp(0);
+                Assert.NotNull(value);
+                Assert.Equal(now.Truncate(TimeSpan.FromTicks(10)), value.Value);
+
+                timestampType = new TimestampType(TimeUnit.Millisecond, TimeZoneInfo.Local);
+                array = new TimestampArray.Builder(timestampType)
+                    .Append(now)
+                    .Build();
+
+                Assert.Equal(1, array.Length);
+                value = array.GetTimestamp(0);
+                Assert.NotNull(value);
+                Assert.Equal(now.Truncate(TimeSpan.FromTicks(TimeSpan.TicksPerMillisecond)), value.Value);
             }
         }
 

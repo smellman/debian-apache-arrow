@@ -25,12 +25,13 @@ User Guide
 
    overview
    conventions
-   cmake
+   build_system
    memory
    arrays
    datatypes
    tables
    compute
+   streaming_execution
    io
    ipc
    parquet
@@ -38,3 +39,4 @@ User Guide
    json
    dataset
    flight
+   gdb

@@ -18,7 +18,7 @@
 Tabular File Formats
 ====================
 
-.. _api.csv:
+.. _py-api-csv:
 
 CSV Files
 ---------
@@ -28,12 +28,17 @@ CSV Files
 .. autosummary::
    :toctree: ../generated/
 
-   ReadOptions
-   ParseOptions
    ConvertOptions
-   read_csv
-   open_csv
    CSVStreamingReader
+   CSVWriter
+   ISO8601
+   ParseOptions
+   ReadOptions
+   WriteOptions
+   open_csv
+   read_csv
+   write_csv
+   InvalidRow
 
 .. _api.feather:
 
@@ -95,3 +100,6 @@ ORC Files
    :toctree: ../generated/
 
    ORCFile
+   ORCWriter
+   read_table
+   write_table

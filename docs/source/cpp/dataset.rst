@@ -33,9 +33,9 @@ Tabular Datasets
 The Arrow Datasets library provides functionality to efficiently work with
 tabular, potentially larger than memory, and multi-file datasets. This includes:
 
-* A unified interface that supports different sources and file formats (currently,
-  Parquet, Feather / Arrow IPC, and CSV files) and different file systems (local,
-  cloud).
+* A unified interface that supports different sources and file formats
+  (currently, Parquet, ORC, Feather / Arrow IPC, and CSV files) and different
+  file systems (local, cloud).
 * Discovery of sources (crawling directories, handling partitioned datasets with
   various partitioning schemes, basic schema normalization, ...)
 * Optimized reading with predicate pushdown (filtering rows), projection
@@ -43,6 +43,8 @@ tabular, potentially larger than memory, and multi-file datasets. This includes:
 
 The goal is to expand support to other file formats and data sources
 (e.g. database connections) in the future.
+
+.. _cpp-dataset-reading:
 
 Reading Datasets
 ----------------
@@ -52,7 +54,8 @@ of a directory with two parquet files:
 
 .. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
    :language: cpp
-   :lines: 50-85
+   :start-after: (Doc section: Reading Datasets)
+   :end-before: (Doc section: Reading Datasets)
    :linenos:
    :lineno-match:
 
@@ -68,7 +71,8 @@ given a base directory path:
 
 .. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
    :language: cpp
-   :lines: 151-165
+   :start-after: (Doc section: Dataset discovery)
+   :end-before: (Doc section: Dataset discovery)
    :emphasize-lines: 6-11
    :linenos:
    :lineno-match:
@@ -103,7 +107,8 @@ method:
 
 .. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
    :language: cpp
-   :lines: 151-170
+   :start-after: (Doc section: Dataset discovery)
+   :end-before: (Doc section: Dataset discovery)
    :emphasize-lines: 16-19
    :linenos:
    :lineno-match:
@@ -119,23 +124,26 @@ Reading different file formats
 The above examples use Parquet files on local disk, but the Dataset API
 provides a consistent interface across multiple file formats and filesystems.
 (See :ref:`cpp-dataset-cloud-storage` for more information on the latter.)
-Currently, Parquet, Feather / Arrow IPC, and CSV file formats are supported;
-more formats are planned in the future.
+Currently, Parquet, ORC, Feather / Arrow IPC, and CSV file formats are
+supported; more formats are planned in the future.
 
 If we save the table as Feather files instead of Parquet files:
 
 .. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
    :language: cpp
-   :lines: 87-104
+   :start-after: (Doc section: Reading different file formats)
+   :end-before: (Doc section: Reading different file formats)
    :linenos:
    :lineno-match:
 
 …then we can read the Feather file by passing an :class:`arrow::dataset::IpcFileFormat`:
 
-.. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
-   :language: cpp
-   :lines: 318,334
-   :linenos:
+.. code-block:: cpp
+
+    auto format = std::make_shared<ds::ParquetFileFormat>();
+    // ...
+    auto factory = ds::FileSystemDatasetFactory::Make(filesystem, selector, format, options)
+                       .ValueOrDie();
 
 Customizing file formats
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -169,7 +177,8 @@ which columns to read:
 
 .. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
    :language: cpp
-   :lines: 172-191
+   :start-after: (Doc section: Filtering data)
+   :end-before: (Doc section: Filtering data)
    :emphasize-lines: 16
    :linenos:
    :lineno-match:
@@ -184,7 +193,8 @@ reduce the amount of I/O needed.
 
 .. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
    :language: cpp
-   :lines: 172-191
+   :start-after: (Doc section: Filtering data)
+   :end-before: (Doc section: Filtering data)
    :emphasize-lines: 17
    :linenos:
    :lineno-match:
@@ -204,7 +214,8 @@ and a vector of names for the columns:
 
 .. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
    :language: cpp
-   :lines: 193-223
+   :start-after: (Doc section: Projecting columns)
+   :end-before: (Doc section: Projecting columns)
    :emphasize-lines: 18-28
    :linenos:
    :lineno-match:
@@ -216,7 +227,8 @@ dataset schema:
 
 .. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
    :language: cpp
-   :lines: 225-254
+   :start-after: (Doc section: Projecting columns #2)
+   :end-before: (Doc section: Projecting columns #2)
    :emphasize-lines: 17-27
    :linenos:
    :lineno-match:
@@ -268,7 +280,8 @@ writing functionality.
 
 .. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
    :language: cpp
-   :lines: 106-149
+   :start-after: (Doc section: Reading and writing partitioned data)
+   :end-before: (Doc section: Reading and writing partitioned data)
    :emphasize-lines: 25-42
    :linenos:
    :lineno-match:
@@ -282,7 +295,8 @@ partitioning scheme:
 
 .. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
    :language: cpp
-   :lines: 256-279
+   :start-after: (Doc section: Reading and writing partitioned data #2)
+   :end-before: (Doc section: Reading and writing partitioned data #2)
    :emphasize-lines: 7,9-11
    :linenos:
    :lineno-match:
@@ -316,7 +330,8 @@ altogether if they do not match the filter:
 
 .. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
    :language: cpp
-   :lines: 281-301
+   :start-after: (Doc section: Reading and writing partitioned data #3)
+   :end-before: (Doc section: Reading and writing partitioned data #3)
    :emphasize-lines: 15-18
    :linenos:
    :lineno-match:
@@ -355,6 +370,44 @@ when constructing a directory partitioning:
 Directory partitioning also supports providing a full schema rather than inferring
 types from file paths.
 
+Partitioning performance considerations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Partitioning datasets has two aspects that affect performance: it increases the number of
+files and it creates a directory structure around the files. Both of these have benefits
+as well as costs. Depending on the configuration and the size of your dataset, the costs 
+can outweigh the benefits. 
+
+Because partitions split up the dataset into multiple files, partitioned datasets can be 
+read and written with parallelism. However, each additional file adds a little overhead in 
+processing for filesystem interaction. It also increases the overall dataset size since 
+each file has some shared metadata. For example, each parquet file contains the schema and
+group-level statistics. The number of partitions is a floor for the number of files. If 
+you partition a dataset by date with a year of data, you will have at least 365 files. If 
+you further partition by another dimension with 1,000 unique values, you will have up to 
+365,000 files. This fine of partitioning often leads to small files that mostly consist of
+metadata.
+
+Partitioned datasets create nested folder structures, and those allow us to prune which 
+files are loaded in a scan. However, this adds overhead to discovering files in the dataset,
+as we'll need to recursively "list directory" to find the data files. Too fine
+partitions can cause problems here: Partitioning a dataset by date for a years worth
+of data will require 365 list calls to find all the files; adding another column with 
+cardinality 1,000 will make that 365,365 calls.
+
+The most optimal partitioning layout will depend on your data, access patterns, and which
+systems will be reading the data. Most systems, including Arrow, should work across a 
+range of file sizes and partitioning layouts, but there are extremes you should avoid. These
+guidelines can help avoid some known worst cases:
+
+* Avoid files smaller than 20MB and larger than 2GB.
+* Avoid partitioning layouts with more than 10,000 distinct partitions.
+
+For file formats that have a notion of groups within a file, such as Parquet, similar
+guidelines apply. Row groups can provide parallelism when reading and allow data skipping
+based on statistics, but very small groups can cause metadata to be a significant portion
+of file size. Arrow's file writer provides sensible defaults for group sizing in most cases.
+
 Reading from other data sources
 -------------------------------
 
@@ -377,7 +430,8 @@ disk which was used in the rest of the example:
 
 .. literalinclude:: ../../../cpp/examples/arrow/dataset_documentation_example.cc
    :language: cpp
-   :lines: 106-149
+   :start-after: Reading and writing partitioned data
+   :end-before: Reading and writing partitioned data
    :emphasize-lines: 24-28
    :linenos:
    :lineno-match:
@@ -394,6 +448,26 @@ See the :ref:`filesystem <cpp-filesystems>` docs for more details on the availab
 filesystems.
 
 .. _cpp-dataset-full-example:
+
+A note on transactions & ACID guarantees
+----------------------------------------
+
+The dataset API offers no transaction support or any ACID guarantees.  This affects
+both reading and writing.  Concurrent reads are fine.  Concurrent writes or writes
+concurring with reads may have unexpected behavior.  Various approaches can be used
+to avoid operating on the same files such as using a unique basename template for
+each writer, a temporary directory for new files, or separate storage of the file
+list instead of relying on directory discovery.
+
+Unexpectedly killing the process while a write is in progress can leave the system
+in an inconsistent state.  Write calls generally return as soon as the bytes to be
+written have been completely delivered to the OS page cache.  Even though a write
+operation has been completed it is possible for part of the file to be lost if
+there is a sudden power loss immediately after the write call.
+
+Most file formats have magic numbers which are written at the end.  This means a
+partial file write can safely be detected and discarded.  The CSV file format does
+not have any such concept and a partially written CSV file may be detected as valid.
 
 Full Example
 ------------
