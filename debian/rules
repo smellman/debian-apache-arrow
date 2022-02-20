@@ -2,7 +2,7 @@
 # -*- makefile-gmake -*-
 #
 # Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+export DH_VERBOSE=1
 # This has to be exported to make some magic below work.
 export DH_OPTIONS
 
@@ -19,15 +19,15 @@ override_dh_auto_configure:
 	  --builddirectory=cpp_build			\
 	  --buildsystem=cmake+ninja				\
 	  --									\
-	  -DARROW_CUDA=ON						\
+	  -DARROW_CUDA=OFF						\
 	  -DARROW_CSV=ON 						\
 	  -DARROW_COMPUTE=ON 					\
 	  -DARROW_DATASET=ON 					\
 	  -DARROW_DEPENDENCY_SOURCE=SYSTEM		\
 	  -DARROW_JSON=ON 						\
 	  -DARROW_FILESYSTEM=ON					\
-	  -DARROW_FLIGHT=ON						\
-	  -DARROW_GANDIVA=ON					\
+	  -DARROW_FLIGHT=OFF					\
+	  -DARROW_GANDIVA=OFF    				\
 	  -DARROW_GANDIVA_JAVA=OFF				\
 	  -DARROW_JEMALLOC=ON					\
 	  -DARROW_MIMALLOC=OFF					\
@@ -86,6 +86,16 @@ override_dh_auto_install:
 override_dh_auto_test:
 	# pass
 
-# skip file failing with "Unknown DWARF DW_OP_255" (see bug#949296)
+override_dh_missing:
+	dh_missing --list-missing
+
+
+# libarrow.so: avoid failing with "Unknown DWARF DW_OP_172"
+# libgandiva.so: avoid failing with "Unknown DWARF DW_OP_255"
+#   See also: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=949296
+# plasma-store-server: avoid failing with "Unknown DWARF DW_OP_1"
 override_dh_dwz:
-	dh_dwz --exclude=libgandiva.so
+	dh_dwz \
+		--exclude=libarrow.so \
+		--exclude=libgandiva.so \
+		--exclude=plasma-store-server

@@ -7,6 +7,105 @@ Files: *
 Copyright: 2016 The Apache Software Foundation
 License: Apache-2.0
 
+Files: src/plasma/fling.cc
+       src/plasma/fling.h
+Copyright: 2013 Sharvil Nanavati
+License: Apache-2.0
+
+Files: cpp/src/plasma/thirdparty/ae/*
+Copyright: 2006-2012, Salvatore Sanfilippo <antirez at gmail dot com>
+           2009 Harish Mallipeddi - harish.mallipeddi@gmail.com
+           2012, Joyent, Inc.
+License: Redis-BSD-3-clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+ .
+  * Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+  * Neither the name of Redis nor the names of its contributors may be used
+    to endorse or promote products derived from this software without
+    specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ POSSIBILITY OF SUCH DAMAGE.
+
+Files: cpp/src/plasma/thirdparty/dlmalloc.c
+Copyright: Doug Lea
+License: CC0
+ This is a version (aka dlmalloc) of malloc/free/realloc written by
+ Doug Lea and released to the public domain, as explained at
+ http://creativecommons.org/publicdomain/zero/1.0/ Send questions,
+ comments, complaints, performance data, etc to dl@cs.oswego.edu
+
+Files: cpp/src/plasma/common.cc
+Copyright: Austin Appleby (aappleby (AT) gmail)
+License: MIT
+ All code is released to the public domain. For business purposes, Murmurhash is
+ under the MIT license.
+Comment:
+ Some portions of this file are derived from code in the MurmurHash project.
+ https://sites.google.com/site/murmurhash/
+
+Files: cpp/src/arrow/util
+Copyright: 2013 The Chromium Authors
+                Google Inc.
+License: Apache-2.0 or Google-BSD-3-clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are
+ met:
+ .
+   * Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+     copyright notice, this list of conditions and the following disclaimer
+     in the documentation and/or other materials provided with the
+     distribution.
+   * Neither the name of Google Inc. nor the names of its
+     contributors may be used to endorse or promote products derived from
+     this software without specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+Comment:
+ (Upstream:) Some portions of this module are derived from code in the Chromium
+ project, copyright (c) Google inc and (c) The Chromium Authors and licensed
+ under the Apache 2.0 License or the under the 3-clause BSD license.
+
+Files: cpp/src/arrow/util/bpacking64_codegen.py
+       cpp/src/arrow/util/bpacking64_default.h
+       cpp/src/arrow/util/bpacking_default.h
+Copyright: 2013 Daniel Lemire
+License: Apache-2.0
+Comment:
+ (Upstream:) This project includes code from Daniel Lemire's FrameOfReference
+ project. https://github.com/lemire/FrameOfReference
+
+
+# TODO
+
+
+
 Files: TODO for "This product includes software from the SFrame project"
 Copyright: 2015 Dato, Inc.
            2009 Carnegie Mellon University.
