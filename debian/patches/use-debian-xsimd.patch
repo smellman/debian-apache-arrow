@@ -1,0 +1,67 @@
+--- a/cpp/cmake_modules/ThirdpartyToolchain.cmake
++++ b/cpp/cmake_modules/ThirdpartyToolchain.cmake
+@@ -638,21 +638,6 @@
+   )
+ endif()
+ 
+-if(DEFINED ENV{ARROW_XSIMD_URL})
+-  set(XSIMD_SOURCE_URL "$ENV{ARROW_XSIMD_URL}")
+-else()
+-  set_urls(XSIMD_SOURCE_URL
+-           "https://github.com/xtensor-stack/xsimd/archive/${ARROW_XSIMD_BUILD_VERSION}.tar.gz"
+-  )
+-endif()
+-
+-if(DEFINED ENV{ARROW_ZLIB_URL})
+-  set(ZLIB_SOURCE_URL "$ENV{ARROW_ZLIB_URL}")
+-else()
+-  set_urls(ZLIB_SOURCE_URL
+-           "https://zlib.net/fossils/zlib-${ARROW_ZLIB_BUILD_VERSION}.tar.gz"
+-           "${THIRDPARTY_MIRROR_URL}/zlib-${ARROW_ZLIB_BUILD_VERSION}.tar.gz")
+-endif()
+ 
+ if(DEFINED ENV{ARROW_ZSTD_URL})
+   set(ZSTD_SOURCE_URL "$ENV{ARROW_ZSTD_URL}")
+@@ -2017,23 +2002,25 @@
+ endif()
+ 
+ macro(build_xsimd)
+-  message(STATUS "Building xsimd from source")
+-  set(XSIMD_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/xsimd_ep/src/xsimd_ep-install")
+-  set(XSIMD_CMAKE_ARGS ${EP_COMMON_CMAKE_ARGS} "-DCMAKE_INSTALL_PREFIX=${XSIMD_PREFIX}")
+-
+-  externalproject_add(xsimd_ep
+-                      ${EP_LOG_OPTIONS}
+-                      PREFIX "${CMAKE_BINARY_DIR}"
+-                      URL ${XSIMD_SOURCE_URL}
+-                      URL_HASH "SHA256=${ARROW_XSIMD_BUILD_SHA256_CHECKSUM}"
+-                      CMAKE_ARGS ${XSIMD_CMAKE_ARGS})
+-
+-  set(XSIMD_INCLUDE_DIR "${XSIMD_PREFIX}/include")
+-
+-  add_dependencies(toolchain xsimd_ep)
+-  add_dependencies(toolchain-tests xsimd_ep)
+-
+-  set(XSIMD_VENDORED TRUE)
++#  message(STATUS "Building xsimd from source")
++#  set(XSIMD_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/xsimd_ep/src/xsimd_ep-install")
++#  set(XSIMD_CMAKE_ARGS ${EP_COMMON_CMAKE_ARGS} "-DCMAKE_INSTALL_PREFIX=${XSIMD_PREFIX}")
++#
++#  externalproject_add(xsimd_ep
++#                      ${EP_LOG_OPTIONS}
++#                      PREFIX "${CMAKE_BINARY_DIR}"
++#                      URL ${XSIMD_SOURCE_URL}
++#                      URL_HASH "SHA256=${ARROW_XSIMD_BUILD_SHA256_CHECKSUM}"
++#                      CMAKE_ARGS ${XSIMD_CMAKE_ARGS})
++#
++#  set(XSIMD_INCLUDE_DIR "${XSIMD_PREFIX}/include")
++#
++#  add_dependencies(toolchain xsimd_ep)
++#  add_dependencies(toolchain-tests xsimd_ep)
++#
++#  set(XSIMD_VENDORED TRUE)
++   set(xsimd_SOURCE "SYSTEM")
++   find_package(xsimd)
+ endmacro()
+ 
+ if((NOT ARROW_SIMD_LEVEL STREQUAL "NONE") OR (NOT ARROW_RUNTIME_SIMD_LEVEL STREQUAL "NONE"
