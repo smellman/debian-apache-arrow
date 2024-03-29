@@ -6,6 +6,7 @@ apache-arrow (7.0.0-1) UNRELEASED; urgency=medium
   [ Diane Trout ]
   * Use Debian source for Brotli, OpenSSL, and Snappy
   * add use-debian-xsimd.patch to use Debian provided xsimd.
+  * FindBrotli.cmake and libarrow_bundled_dependencies don't exist.
 
  -- Sascha Steinbiss <satta@debian.org>  Sun, 20 Feb 2022 12:57:32 +0100
 
