@@ -10,6 +10,7 @@ apache-arrow (7.0.0-1) UNRELEASED; urgency=medium
   * Install built FindThrift*.cmake scripts
   * Disable non-free nvidia dependency for now
   * Install readme, notice and license into the main -dev package
+  * Turn off jemalloc as upstream wants to build from downloaded source
 
  -- Sascha Steinbiss <satta@debian.org>  Sun, 20 Feb 2022 12:57:32 +0100
 

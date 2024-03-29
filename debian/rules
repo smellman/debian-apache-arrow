@@ -29,7 +29,7 @@ override_dh_auto_configure:
 	  -DARROW_FLIGHT=OFF					\
 	  -DARROW_GANDIVA=OFF    				\
 	  -DARROW_GANDIVA_JAVA=OFF				\
-	  -DARROW_JEMALLOC=ON					\
+	  -DARROW_JEMALLOC=OFF					\
 	  -DARROW_MIMALLOC=OFF					\
 	  -DARROW_ORC=OFF						\
 	  -DARROW_OPENSSL_USE_SHARED=ON				\
