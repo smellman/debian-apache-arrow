@@ -9,6 +9,7 @@ export DH_OPTIONS
 export DEB_BUILD_MAINT_OPTIONS=reproducible=-timeless
 
 BUILD_TYPE=release
+PYBUILD_NAME=pyarrow
 
 %:
 	dh $@ --with gir
@@ -67,6 +68,15 @@ override_dh_auto_build:
 	      --builddirectory=c_glib_build			\
 	      --buildsystem=meson+ninja
 
+	# as far as I can tell pyarrow needs the installed directory
+	# structure to build
+	dh_auto_install				\
+	  --sourcedirectory=cpp			\
+	  --builddirectory=cpp_build
+	PYARROW_CMAKE_OPTIONS="-DARROW_HOME=$(CURDIR)/debian/tmp/usr" dh_auto_build \
+	  --buildsystem=pybuild \
+	  --sourcedirectory=python
+
 override_dh_auto_install:
 	dh_auto_install				\
 	  --sourcedirectory=c_glib		\
@@ -86,8 +96,14 @@ override_dh_auto_install:
 	  --sourcedirectory=cpp			\
 	  --builddirectory=cpp_build
 
+	dh_auto_install --buildsystem=pybuild --sourcdirectory=python
+
 override_dh_auto_test:
 	# pass
+	LD_LIBRARY_PATH=$(CURDIR)/debian/tmp/usr/lib/x86_64-linux-gnu \
+	dh_auto_test \
+	  --buildsystem=pybuild \
+	  --sourcedirectory python
 
 override_dh_missing:
 	dh_missing --fail-missing
