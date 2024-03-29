@@ -24,7 +24,7 @@ Build-Depends:
   libutf8proc-dev,
   libzstd-dev,
   ninja-build,
-  nvidia-cuda-toolkit [!arm64],
+#  nvidia-cuda-toolkit [!arm64],
   pkg-config,
   libprotobuf-dev,
   libprotoc-dev,
