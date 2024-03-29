@@ -90,7 +90,7 @@ override_dh_auto_test:
 	# pass
 
 override_dh_missing:
-	dh_missing --list-missing
+	dh_missing --fail-missing
 
 
 # libarrow.so: avoid failing with "Unknown DWARF DW_OP_172"
