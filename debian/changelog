@@ -14,6 +14,7 @@ apache-arrow (7.0.0-1) UNRELEASED; urgency=medium
   * fail-missing files that are not installed to help develop packaging
   * Build and test pyarrow
   * add fix-upstream-watch to keep uscan from finding wrong arrow repositories
+  * Add a more modern debian/watch file
 
  -- Sascha Steinbiss <satta@debian.org>  Sun, 20 Feb 2022 12:57:32 +0100
 
