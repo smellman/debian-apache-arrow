@@ -39,13 +39,23 @@ gdb_script = (os.environ.get('ARROW_GDB_SCRIPT') or
 gdb_command = ["gdb", "--nx"]
 
 
+def environment_for_gdb():
+    env = {}
+    for var in ['PATH', 'LD_LIBRARY_PATH']:
+        try:
+            env[var] = os.environ[var]
+        except KeyError:
+            pass
+    return env
+
+
 @lru_cache()
 def is_gdb_available():
     try:
         # Try to use the same arguments as in GdbSession so that the
         # same error return gets propagated.
         proc = subprocess.run(gdb_command + ["--version"],
-                              env={}, bufsize=0,
+                              env=environment_for_gdb(), bufsize=0,
                               stdin=subprocess.PIPE,
                               stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT)
@@ -77,8 +87,10 @@ class GdbSession:
 
     def __init__(self, *args, **env):
         # Let stderr through to let pytest display it separately on errors
+        gdb_env = environment_for_gdb()
+        gdb_env.update(env)
         self.proc = subprocess.Popen(gdb_command + list(args),
-                                     env=env, bufsize=0,
+                                     env=gdb_env, bufsize=0,
                                      stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE)
         self.last_stdout = []
@@ -142,7 +154,7 @@ class GdbSession:
         # but it's not available on old GDB versions (such as 8.1.1),
         # so instead parse the stack trace for a matching frame number.
         out = self.run_command("info stack")
-        pat = r"(?mi)^#(\d+)\s+.* in " + re.escape(func_name) + " "
+        pat = r"(?mi)^#(\d+)\s+.* in " + re.escape(func_name) + r"\b"
         m = re.search(pat, out)
         if m is None:
             pytest.fail(f"Could not select frame for function {func_name}")
@@ -228,7 +240,7 @@ def check_heap_repr(gdb, expr, expected):
     Check printing a heap-located value, given its address.
     """
     s = gdb.print_value(f"*{expr}")
-    # GDB may prefix the value with an adress or type specification
+    # GDB may prefix the value with an address or type specification
     if s != expected:
         assert s.endswith(f" {expected}")
 
@@ -252,20 +264,6 @@ def test_status(gdb_arrow):
         'detail=[custom-detail-id] "This is a detail"))')
 
 
-def test_string_view(gdb_arrow):
-    check_stack_repr(gdb_arrow, "string_view_empty",
-                     "arrow::util::string_view of size 0")
-    check_stack_repr(gdb_arrow, "string_view_abc",
-                     'arrow::util::string_view of size 3, "abc"')
-    check_stack_repr(
-        gdb_arrow, "string_view_special_chars",
-        r'arrow::util::string_view of size 12, "foo\"bar\000\r\n\t\037"')
-    check_stack_repr(
-        gdb_arrow, "string_view_very_long",
-        'arrow::util::string_view of size 5006, '
-        '"abc", \'K\' <repeats 5000 times>...')
-
-
 def test_buffer_stack(gdb_arrow):
     check_stack_repr(gdb_arrow, "buffer_null",
                      "arrow::Buffer of size 0, read-only")
@@ -283,26 +281,6 @@ def test_buffer_heap(gdb_arrow):
                     'arrow::Buffer of size 3, read-only, "abc"')
     check_heap_repr(gdb_arrow, "heap_buffer_mutable.get()",
                     'arrow::Buffer of size 3, mutable, "abc"')
-
-
-def test_optionals(gdb_arrow):
-    check_stack_repr(gdb_arrow, "int_optional",
-                     "arrow::util::optional<int>(42)")
-    check_stack_repr(gdb_arrow, "null_int_optional",
-                     "arrow::util::optional<int>(nullopt)")
-
-
-def test_variants(gdb_arrow):
-    check_stack_repr(
-        gdb_arrow, "int_variant",
-        "arrow::util::Variant of index 0 (actual type int), value 42")
-    check_stack_repr(
-        gdb_arrow, "bool_variant",
-        "arrow::util::Variant of index 1 (actual type bool), value false")
-    check_stack_repr(
-        gdb_arrow, "string_variant",
-        re.compile(r'^arrow::util::Variant of index 2 \(actual type '
-                   r'std::.*string.*\), value .*"hello".*'))
 
 
 def test_decimals(gdb_arrow):
@@ -577,11 +555,11 @@ def test_scalars_stack(gdb_arrow):
         "arrow::MonthDayNanoIntervalScalar of null value")
 
     check_stack_repr(gdb_arrow, "date32_scalar",
-                     "arrow::Date32Scalar of value 23d")
+                     "arrow::Date32Scalar of value 23d [1970-01-24]")
     check_stack_repr(gdb_arrow, "date32_scalar_null",
                      "arrow::Date32Scalar of null value")
     check_stack_repr(gdb_arrow, "date64_scalar",
-                     "arrow::Date64Scalar of value 3870000000ms")
+                     "arrow::Date64Scalar of value 3888000000ms [1970-02-15]")
     check_stack_repr(gdb_arrow, "date64_scalar_null",
                      "arrow::Date64Scalar of null value")
 
@@ -671,7 +649,7 @@ def test_scalars_stack(gdb_arrow):
         'arrow::FixedSizeBinaryScalar of size 3, value "abc"')
     check_stack_repr(
         gdb_arrow, "fixed_size_binary_scalar_null",
-        'arrow::FixedSizeBinaryScalar of size 3, null value')
+        'arrow::FixedSizeBinaryScalar of size 3, null with value "   "')
 
     check_stack_repr(
         gdb_arrow, "dict_scalar",
@@ -688,14 +666,14 @@ def test_scalars_stack(gdb_arrow):
     check_stack_repr(
         gdb_arrow, "list_scalar",
         ('arrow::ListScalar of value arrow::Int32Array of '
-         'length 3, null count 0'))
+         'length 3, offset 0, null count 0 = {[0] = 4, [1] = 5, [2] = 6}'))
     check_stack_repr(
         gdb_arrow, "list_scalar_null",
         'arrow::ListScalar of type arrow::list(arrow::int32()), null value')
     check_stack_repr(
         gdb_arrow, "large_list_scalar",
         ('arrow::LargeListScalar of value arrow::Int32Array of '
-         'length 3, null count 0'))
+         'length 3, offset 0, null count 0 = {[0] = 4, [1] = 5, [2] = 6}'))
     check_stack_repr(
         gdb_arrow, "large_list_scalar_null",
         ('arrow::LargeListScalar of type arrow::large_list(arrow::int32()), '
@@ -703,7 +681,7 @@ def test_scalars_stack(gdb_arrow):
     check_stack_repr(
         gdb_arrow, "fixed_size_list_scalar",
         ('arrow::FixedSizeListScalar of value arrow::Int32Array of '
-         'length 3, null count 0'))
+         'length 3, offset 0, null count 0 = {[0] = 4, [1] = 5, [2] = 6}'))
     check_stack_repr(
         gdb_arrow, "fixed_size_list_scalar_null",
         ('arrow::FixedSizeListScalar of type '
@@ -762,7 +740,7 @@ def test_scalars_heap(gdb_arrow):
     check_heap_repr(
         gdb_arrow, "heap_map_scalar",
         ('arrow::MapScalar of type arrow::map(arrow::utf8(), arrow::int32(), '
-         'keys_sorted=false), value length 2, null count 0'))
+         'keys_sorted=false), value length 2, offset 0, null count 0'))
     check_heap_repr(
         gdb_arrow, "heap_map_scalar_null",
         ('arrow::MapScalar of type arrow::map(arrow::utf8(), arrow::int32(), '
@@ -772,27 +750,227 @@ def test_scalars_heap(gdb_arrow):
 def test_array_data(gdb_arrow):
     check_stack_repr(
         gdb_arrow, "int32_array_data",
-        "arrow::ArrayData of type arrow::int32(), length 4, null count 1")
+        ("arrow::ArrayData of type arrow::int32(), length 4, offset 0, "
+         "null count 1 = {[0] = -5, [1] = 6, [2] = null, [3] = 42}"))
 
 
 def test_arrays_stack(gdb_arrow):
     check_stack_repr(
         gdb_arrow, "int32_array",
-        "arrow::Int32Array of length 4, null count 1")
+        ("arrow::Int32Array of length 4, offset 0, null count 1 = "
+         "{[0] = -5, [1] = 6, [2] = null, [3] = 42}"))
     check_stack_repr(
         gdb_arrow, "list_array",
         ("arrow::ListArray of type arrow::list(arrow::int64()), "
-         "length 3, null count 1"))
+         "length 3, offset 0, null count 1"))
 
 
 def test_arrays_heap(gdb_arrow):
+    # Null
+    check_heap_repr(
+        gdb_arrow, "heap_null_array",
+        "arrow::NullArray of length 2, offset 0, null count 2")
+
+    # Primitive
     check_heap_repr(
         gdb_arrow, "heap_int32_array",
-        "arrow::Int32Array of length 4, null count 1")
+        ("arrow::Int32Array of length 4, offset 0, null count 1 = {"
+         "[0] = -5, [1] = 6, [2] = null, [3] = 42}"))
+    check_heap_repr(
+        gdb_arrow, "heap_int32_array_no_nulls",
+        ("arrow::Int32Array of length 4, offset 0, null count 0 = {"
+         "[0] = -5, [1] = 6, [2] = 3, [3] = 42}"))
+    check_heap_repr(
+        gdb_arrow, "heap_int32_array_sliced_1_9",
+        ("arrow::Int32Array of length 9, offset 1, unknown null count = {"
+         "[0] = 2, [1] = -3, [2] = 4, [3] = null, [4] = -5, [5] = 6, "
+         "[6] = -7, [7] = 8, [8] = null}"))
+    check_heap_repr(
+        gdb_arrow, "heap_int32_array_sliced_2_6",
+        ("arrow::Int32Array of length 6, offset 2, unknown null count = {"
+         "[0] = -3, [1] = 4, [2] = null, [3] = -5, [4] = 6, [5] = -7}"))
+    check_heap_repr(
+        gdb_arrow, "heap_int32_array_sliced_8_4",
+        ("arrow::Int32Array of length 4, offset 8, unknown null count = {"
+         "[0] = 8, [1] = null, [2] = -9, [3] = -10}"))
+    check_heap_repr(
+        gdb_arrow, "heap_int32_array_sliced_empty",
+        "arrow::Int32Array of length 0, offset 6, unknown null count")
+
+    check_heap_repr(
+        gdb_arrow, "heap_double_array",
+        ("arrow::DoubleArray of length 2, offset 0, null count 1 = {"
+         "[0] = -1.5, [1] = null}"))
+    check_heap_repr(
+        gdb_arrow, "heap_float16_array",
+        ("arrow::HalfFloatArray of length 2, offset 0, null count 0 = {"
+         "[0] = 0.0, [1] = -1.5}"))
+
+    # Boolean
+    check_heap_repr(
+        gdb_arrow, "heap_bool_array",
+        ("arrow::BooleanArray of length 18, offset 0, null count 6 = {"
+         "[0] = false, [1] = false, [2] = true, [3] = true, [4] = null, "
+         "[5] = null, [6] = false, [7] = false, [8] = true, [9] = true, "
+         "[10] = null, [11] = null, [12] = false, [13] = false, "
+         "[14] = true, [15] = true, [16] = null, [17] = null}"))
+    check_heap_repr(
+        gdb_arrow, "heap_bool_array_sliced_1_9",
+        ("arrow::BooleanArray of length 9, offset 1, unknown null count = {"
+         "[0] = false, [1] = true, [2] = true, [3] = null, [4] = null, "
+         "[5] = false, [6] = false, [7] = true, [8] = true}"))
+    check_heap_repr(
+        gdb_arrow, "heap_bool_array_sliced_2_6",
+        ("arrow::BooleanArray of length 6, offset 2, unknown null count = {"
+         "[0] = true, [1] = true, [2] = null, [3] = null, [4] = false, "
+         "[5] = false}"))
+    check_heap_repr(
+        gdb_arrow, "heap_bool_array_sliced_empty",
+        "arrow::BooleanArray of length 0, offset 6, unknown null count")
+
+    # Temporal
+    check_heap_repr(
+        gdb_arrow, "heap_date32_array",
+        ("arrow::Date32Array of length 6, offset 0, null count 1 = {"
+         "[0] = 0d [1970-01-01], [1] = null, [2] = 18336d [2020-03-15], "
+         "[3] = -9004d [1945-05-08], [4] = -719162d [0001-01-01], "
+         "[5] = -719163d [year <= 0]}"))
+    check_heap_repr(
+        gdb_arrow, "heap_date64_array",
+        ("arrow::Date64Array of length 5, offset 0, null count 0 = {"
+         "[0] = 1584230400000ms [2020-03-15], "
+         "[1] = -777945600000ms [1945-05-08], "
+         "[2] = -62135596800000ms [0001-01-01], "
+         "[3] = -62135683200000ms [year <= 0], "
+         "[4] = 123ms [non-multiple of 86400000]}"))
+    check_heap_repr(
+        gdb_arrow, "heap_time32_array_s",
+        ("arrow::Time32Array of type arrow::time32(arrow::TimeUnit::SECOND), "
+         "length 3, offset 0, null count 1 = {"
+         "[0] = null, [1] = -123s, [2] = 456s}"))
+    check_heap_repr(
+        gdb_arrow, "heap_time32_array_ms",
+        ("arrow::Time32Array of type arrow::time32(arrow::TimeUnit::MILLI), "
+         "length 3, offset 0, null count 1 = {"
+         "[0] = null, [1] = -123ms, [2] = 456ms}"))
+    check_heap_repr(
+        gdb_arrow, "heap_time64_array_us",
+        ("arrow::Time64Array of type arrow::time64(arrow::TimeUnit::MICRO), "
+         "length 3, offset 0, null count 1 = {"
+         "[0] = null, [1] = -123us, [2] = 456us}"))
+    check_heap_repr(
+        gdb_arrow, "heap_time64_array_ns",
+        ("arrow::Time64Array of type arrow::time64(arrow::TimeUnit::NANO), "
+         "length 3, offset 0, null count 1 = {"
+         "[0] = null, [1] = -123ns, [2] = 456ns}"))
+    check_heap_repr(
+        gdb_arrow, "heap_month_interval_array",
+        ("arrow::MonthIntervalArray of length 3, offset 0, null count 1 = {"
+         "[0] = 123M, [1] = -456M, [2] = null}"))
+    check_heap_repr(
+        gdb_arrow, "heap_day_time_interval_array",
+        ("arrow::DayTimeIntervalArray of length 2, offset 0, null count 1 = {"
+         "[0] = 1d-600ms, [1] = null}"))
+    check_heap_repr(
+        gdb_arrow, "heap_month_day_nano_interval_array",
+        ("arrow::MonthDayNanoIntervalArray of length 2, offset 0, "
+         "null count 1 = {[0] = 1M-600d5000ns, [1] = null}"))
+    check_heap_repr(
+        gdb_arrow, "heap_duration_array_s",
+        ("arrow::DurationArray of type arrow::duration"
+         "(arrow::TimeUnit::SECOND), length 2, offset 0, null count 1 = {"
+         "[0] = null, [1] = -1234567890123456789s}"))
+    check_heap_repr(
+        gdb_arrow, "heap_duration_array_ns",
+        ("arrow::DurationArray of type arrow::duration"
+         "(arrow::TimeUnit::NANO), length 2, offset 0, null count 1 = {"
+         "[0] = null, [1] = -1234567890123456789ns}"))
+    check_heap_repr(
+        gdb_arrow, "heap_timestamp_array_s",
+        ("arrow::TimestampArray of type arrow::timestamp"
+         "(arrow::TimeUnit::SECOND), length 4, offset 0, null count 1 = {"
+         "[0] = null, [1] = 0s [1970-01-01 00:00:00], "
+         "[2] = -2203932304s [1900-02-28 12:34:56], "
+         "[3] = 63730281600s [3989-07-14 00:00:00]}"))
+    check_heap_repr(
+        gdb_arrow, "heap_timestamp_array_ms",
+        ("arrow::TimestampArray of type arrow::timestamp"
+         "(arrow::TimeUnit::MILLI), length 3, offset 0, null count 1 = {"
+         "[0] = null, [1] = -2203932303877ms [1900-02-28 12:34:56.123], "
+         "[2] = 63730281600789ms [3989-07-14 00:00:00.789]}"))
+    check_heap_repr(
+        gdb_arrow, "heap_timestamp_array_us",
+        ("arrow::TimestampArray of type arrow::timestamp"
+         "(arrow::TimeUnit::MICRO), length 3, offset 0, null count 1 = {"
+         "[0] = null, "
+         "[1] = -2203932303345679us [1900-02-28 12:34:56.654321], "
+         "[2] = 63730281600456789us [3989-07-14 00:00:00.456789]}"))
+    check_heap_repr(
+        gdb_arrow, "heap_timestamp_array_ns",
+        ("arrow::TimestampArray of type arrow::timestamp"
+         "(arrow::TimeUnit::NANO), length 2, offset 0, null count 1 = {"
+         "[0] = null, "
+         "[1] = -2203932303012345679ns [1900-02-28 12:34:56.987654321]}"))
+
+    # Decimal
+    check_heap_repr(
+        gdb_arrow, "heap_decimal128_array",
+        ("arrow::Decimal128Array of type arrow::decimal128(30, 6), "
+         "length 3, offset 0, null count 1 = {"
+         "[0] = null, [1] = -1234567890123456789.012345, "
+         "[2] = 1234567890123456789.012345}"))
+    check_heap_repr(
+        gdb_arrow, "heap_decimal256_array",
+        ("arrow::Decimal256Array of type arrow::decimal256(50, 6), "
+         "length 2, offset 0, null count 1 = {"
+         "[0] = null, "
+         "[1] = -123456789012345678901234567890123456789.012345}"))
+    check_heap_repr(
+        gdb_arrow, "heap_decimal128_array_sliced",
+        ("arrow::Decimal128Array of type arrow::decimal128(30, 6), "
+         "length 1, offset 1, unknown null count = {"
+         "[0] = -1234567890123456789.012345}"))
+
+    # Binary-like
+    check_heap_repr(
+        gdb_arrow, "heap_fixed_size_binary_array",
+        (r'arrow::FixedSizeBinaryArray of type arrow::fixed_size_binary(3), '
+         r'length 3, offset 0, null count 1 = {'
+         r'[0] = null, [1] = "abc", [2] = "\000\037\377"}'))
+    check_heap_repr(
+        gdb_arrow, "heap_fixed_size_binary_array_zero_width",
+        (r'arrow::FixedSizeBinaryArray of type arrow::fixed_size_binary(0), '
+         r'length 2, offset 0, null count 1 = {[0] = null, [1] = ""}'))
+    check_heap_repr(
+        gdb_arrow, "heap_fixed_size_binary_array_sliced",
+        (r'arrow::FixedSizeBinaryArray of type arrow::fixed_size_binary(3), '
+         r'length 1, offset 1, unknown null count = {[0] = "abc"}'))
+    check_heap_repr(
+        gdb_arrow, "heap_binary_array",
+        (r'arrow::BinaryArray of length 3, offset 0, null count 1 = {'
+         r'[0] = null, [1] = "abcd", [2] = "\000\037\377"}'))
+    check_heap_repr(
+        gdb_arrow, "heap_large_binary_array",
+        (r'arrow::LargeBinaryArray of length 3, offset 0, null count 1 = {'
+         r'[0] = null, [1] = "abcd", [2] = "\000\037\377"}'))
+    check_heap_repr(
+        gdb_arrow, "heap_string_array",
+        (r'arrow::StringArray of length 3, offset 0, null count 1 = {'
+         r'[0] = null, [1] = "héhé", [2] = "invalid \\xff char"}'))
+    check_heap_repr(
+        gdb_arrow, "heap_large_string_array",
+        (r'arrow::LargeStringArray of length 3, offset 0, null count 1 = {'
+         r'[0] = null, [1] = "héhé", [2] = "invalid \\xff char"}'))
+    check_heap_repr(
+        gdb_arrow, "heap_binary_array_sliced",
+        (r'arrow::BinaryArray of length 1, offset 1, unknown null count = '
+         r'{[0] = "abcd"}'))
+
+    # Nested
     check_heap_repr(
         gdb_arrow, "heap_list_array",
         ("arrow::ListArray of type arrow::list(arrow::int64()), "
-         "length 3, null count 1"))
+         "length 3, offset 0, null count 1"))
 
 
 def test_schema(gdb_arrow):
@@ -812,32 +990,28 @@ def test_chunked_array(gdb_arrow):
     check_stack_repr(
         gdb_arrow, "chunked_array",
         ("arrow::ChunkedArray of type arrow::int32(), length 5, null count 1 "
-         "with 2 chunks = {[0] = length 2, null count 0, "
-         "[1] = length 3, null count 1}"))
+         "with 2 chunks = {[0] = length 2, offset 0, null count 0, "
+         "[1] = length 3, offset 0, null count 1}"))
 
 
 def test_record_batch(gdb_arrow):
-    expected_batch = (
-        'arrow::RecordBatch with 2 columns, 3 rows = {'
-        '["ints"] = arrow::ArrayData of type arrow::int32(), '
-        'length 3, null count 0, '
+    expected_prefix = 'arrow::RecordBatch with 2 columns, 3 rows'
+    expected_suffix = (
+        '{["ints"] = arrow::ArrayData of type arrow::int32(), '
+        'length 3, offset 0, null count 0 = '
+        '{[0] = 1, [1] = 2, [2] = 3}, '
         '["strs"] = arrow::ArrayData of type arrow::utf8(), '
-        'length 3, null count 1}')
+        'length 3, offset 0, null count 1 = '
+        '{[0] = "abc", [1] = null, [2] = "def"}}')
 
+    expected = f"{expected_prefix} = {expected_suffix}"
     # Representations may differ between those two because of
     # RecordBatch (base class) vs. SimpleRecordBatch (concrete class).
-    check_heap_repr(gdb_arrow, "batch", expected_batch)
-    check_heap_repr(gdb_arrow, "batch.get()", expected_batch)
+    check_heap_repr(gdb_arrow, "batch", expected)
+    check_heap_repr(gdb_arrow, "batch.get()", expected)
 
-    expected_batch_with_metadata = (
-        'arrow::RecordBatch with 2 columns, 3 rows, 3 metadata items = {'
-        '["ints"] = arrow::ArrayData of type arrow::int32(), '
-        'length 3, null count 0, '
-        '["strs"] = arrow::ArrayData of type arrow::utf8(), '
-        'length 3, null count 1}')
-
-    check_heap_repr(gdb_arrow, "batch_with_metadata",
-                    expected_batch_with_metadata)
+    expected = f"{expected_prefix}, 3 metadata items = {expected_suffix}"
+    check_heap_repr(gdb_arrow, "batch_with_metadata", expected)
 
 
 def test_table(gdb_arrow):
@@ -845,11 +1019,13 @@ def test_table(gdb_arrow):
         'arrow::Table with 2 columns, 5 rows = {'
         '["ints"] = arrow::ChunkedArray of type arrow::int32(), '
         'length 5, null count 0 with 2 chunks = '
-        '{[0] = length 3, null count 0, [1] = length 2, null count 0}, '
+        '{[0] = length 3, offset 0, null count 0, '
+        '[1] = length 2, offset 0, null count 0}, '
         '["strs"] = arrow::ChunkedArray of type arrow::utf8(), '
         'length 5, null count 1 with 3 chunks = '
-        '{[0] = length 2, null count 1, [1] = length 1, null count 0, '
-        '[2] = length 2, null count 0}}')
+        '{[0] = length 2, offset 0, null count 1, '
+        '[1] = length 1, offset 0, null count 0, '
+        '[2] = length 2, offset 0, null count 0}}')
 
     # Same as RecordBatch above (Table vs. SimpleTable)
     check_heap_repr(gdb_arrow, "table", expected_table)
