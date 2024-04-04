@@ -1,0 +1,11 @@
+Author: Diane Trout <diane@ghic.org>
+Description: uscan finds upstreams watch file and uses it to scans for source archives.
+ Unfortunately it's too loosely specified and find some other related arrow packages.
+
+--- a/dev/tasks/linux-packages/apache-arrow/debian/watch
++++ b/dev/tasks/linux-packages/apache-arrow/debian/watch
+@@ -1,2 +1,3 @@
+ version=3
+-https://dist.apache.org/repos/dist/release/arrow/arrow-(.+)/apache-arrow-(.+).tar.gz
++https://dist.apache.org/repos/dist/release/arrow/arrow@ANY_VERSION@/apache-arrow@ANY_VERSION@.@ARCHIVE_EXT@
++

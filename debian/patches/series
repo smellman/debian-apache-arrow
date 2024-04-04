@@ -1,2 +1,3 @@
 fix-llvm-requirement.patch
 use-debian-xsimd.patch
+fix-upstream-watch.patch
