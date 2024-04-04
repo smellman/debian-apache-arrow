@@ -40,9 +40,23 @@ set(CLANG_TOOLS_SEARCH_PATHS
     /usr/local/bin
     /usr/bin
     "C:/Program Files/LLVM/bin" # Windows, non-conda
-    "$ENV{CONDA_PREFIX}/Library/bin") # Windows, conda
-if(CLANG_TOOLS_BREW_PREFIX)
-  list(APPEND CLANG_TOOLS_SEARCH_PATHS "${CLANG_TOOLS_BREW}/bin")
+    "$ENV{CONDA_PREFIX}/Library/bin" # Windows, conda
+    "$ENV{CONDA_PREFIX}/bin") # Unix, conda
+if(APPLE)
+  find_program(BREW brew)
+  if(BREW)
+    execute_process(COMMAND ${BREW} --prefix "llvm@${ARROW_CLANG_TOOLS_VERSION_MAJOR}"
+                    OUTPUT_VARIABLE CLANG_TOOLS_BREW_PREFIX
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT CLANG_TOOLS_BREW_PREFIX)
+      execute_process(COMMAND ${BREW} --prefix llvm
+                      OUTPUT_VARIABLE CLANG_TOOLS_BREW_PREFIX
+                      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    endif()
+    if(CLANG_TOOLS_BREW_PREFIX)
+      list(APPEND CLANG_TOOLS_SEARCH_PATHS "${CLANG_TOOLS_BREW_PREFIX}/bin")
+    endif()
+  endif()
 endif()
 
 function(FIND_CLANG_TOOL NAME OUTPUT VERSION_CHECK_PATTERN)
@@ -95,7 +109,7 @@ else()
 endif()
 
 find_clang_tool(clang-format CLANG_FORMAT_BIN
-                "^clang-format version ${ARROW_CLANG_TOOLS_VERSION_ESCAPED}")
+                "clang-format version ${ARROW_CLANG_TOOLS_VERSION_ESCAPED}")
 if(CLANG_FORMAT_BIN)
   set(CLANG_FORMAT_FOUND 1)
   message(STATUS "clang-format found at ${CLANG_FORMAT_BIN}")

@@ -38,14 +38,24 @@
 
 #cmakedefine ARROW_COMPUTE
 #cmakedefine ARROW_CSV
+#cmakedefine ARROW_CUDA
 #cmakedefine ARROW_DATASET
 #cmakedefine ARROW_FILESYSTEM
 #cmakedefine ARROW_FLIGHT
+#cmakedefine ARROW_FLIGHT_SQL
 #cmakedefine ARROW_IPC
+#cmakedefine ARROW_JEMALLOC
+#cmakedefine ARROW_JEMALLOC_VENDORED
 #cmakedefine ARROW_JSON
+#cmakedefine ARROW_ORC
+#cmakedefine ARROW_PARQUET
+#cmakedefine ARROW_SUBSTRAIT
 
+#cmakedefine ARROW_ENABLE_THREADING
+#cmakedefine ARROW_GCS
 #cmakedefine ARROW_S3
 #cmakedefine ARROW_USE_NATIVE_INT128
+#cmakedefine ARROW_WITH_MUSL
 #cmakedefine ARROW_WITH_OPENTELEMETRY
-
-#cmakedefine GRPCPP_PP_INCLUDE
+#cmakedefine ARROW_WITH_UCX
+#cmakedefine PARQUET_REQUIRE_ENCRYPTION

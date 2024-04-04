@@ -105,19 +105,27 @@ py_to_r.pyarrow.lib.ChunkedArray <- function(x, ...) {
 }
 
 r_to_py.Table <- function(x, convert = FALSE) {
-  # Import with convert = FALSE so that `_import_from_c` returns a Python object
-  pa <- reticulate::import("pyarrow", convert = FALSE)
-  out <- pa$Table$from_arrays(x$columns, schema = x$schema)
-  # But set the convert attribute on the return object to the requested value
+  # TODO(ARROW-16269): Going through RecordBatchReader maintains schema
+  # metadata (e.g., extension types) more faithfully than column-wise
+  # construction; however, may re-chunk columns unnecessarily.
+  py_rbr <- reticulate::r_to_py(as_record_batch_reader(x), convert = FALSE)
+  out <- py_rbr$read_all()
   assign("convert", convert, out)
   out
 }
 
 py_to_r.pyarrow.lib.Table <- function(x, ...) {
-  colnames <- maybe_py_to_r(x$column_names)
-  r_cols <- maybe_py_to_r(x$columns)
-  names(r_cols) <- colnames
-  Table$create(!!!r_cols, schema = maybe_py_to_r(x$schema))
+  # TODO(ARROW-16269): Going through RecordBatchReader maintains schema
+  # metadata (e.g., extension types) more faithfully than column-wise
+  # construction; however, may re-chunk columns unnecessarily.
+  pa <- reticulate::import("pyarrow", convert = FALSE)
+  py_rbr <- pa$lib$RecordBatchReader$from_batches(
+    x$schema,
+    x$to_batches()
+  )
+
+  r_rbr <- maybe_py_to_r(py_rbr)
+  r_rbr$read_table()
 }
 
 py_to_r.pyarrow.lib.Schema <- function(x, ...) {
@@ -235,6 +243,75 @@ maybe_py_to_r <- function(x) {
   x
 }
 
+
+#' @export
+as_arrow_array.pyarrow.lib.Array <- function(x, ..., type = NULL) {
+  as_arrow_array(py_to_r.pyarrow.lib.Array(x), type = type)
+}
+
+# nolint start
+#' @export
+as_chunked_array.pyarrow.lib.ChunkedArray <- function(x, ..., type = NULL) {
+  as_chunked_array(py_to_r.pyarrow.lib.ChunkedArray(x), type = type)
+}
+# nolint end
+
+#' @export
+as_record_batch.pyarrow.lib.RecordBatch <- function(x, ..., schema = NULL) {
+  as_record_batch(py_to_r.pyarrow.lib.RecordBatch(x), schema = schema)
+}
+
+#' @export
+as_arrow_table.pyarrow.lib.RecordBatch <- function(x, ..., schema = NULL) {
+  as_arrow_table(py_to_r.pyarrow.lib.RecordBatch(x), schema = schema)
+}
+
+# Some of these function names are longer than 40 characters
+# (but have to be named such because of S3 method naming)
+# nolint start
+#' @export
+as_record_batch_reader.pyarrow.lib.RecordBatch <- function(x, ...) {
+  as_record_batch_reader(py_to_r.pyarrow.lib.RecordBatch(x))
+}
+# nolint end
+
+#' @export
+as_record_batch.pyarrow.lib.Table <- function(x, ..., schema = NULL) {
+  as_record_batch(py_to_r.pyarrow.lib.Table(x), schema = schema)
+}
+
+#' @export
+as_arrow_table.pyarrow.lib.Table <- function(x, ..., schema = NULL) {
+  as_arrow_table(py_to_r.pyarrow.lib.Table(x), schema = schema)
+}
+
+#' @export
+as_record_batch_reader.pyarrow.lib.Table <- function(x, ...) {
+  as_record_batch_reader(py_to_r.pyarrow.lib.Table(x))
+}
+
+#' @export
+as_schema.pyarrow.lib.Schema <- function(x, ...) {
+  py_to_r.pyarrow.lib.Schema(x)
+}
+
+#' @export
+as_data_type.pyarrow.lib.Field <- function(x, ...) {
+  as_data_type(py_to_r.pyarrow.lib.Field(x))
+}
+
+#' @export
+as_data_type.pyarrow.lib.DataType <- function(x, ...) {
+  as_data_type(py_to_r.pyarrow.lib.DataType(x))
+}
+
+# nolint start
+#' @export
+as_record_batch_reader.pyarrow.lib.RecordBatchReader <- function(x, ...) {
+  py_to_r.pyarrow.lib.RecordBatchReader(x)
+}
+# nolint end
+
 #' Install pyarrow for use with reticulate
 #'
 #' `pyarrow` is the Python package for Apache Arrow. This function helps with
@@ -262,15 +339,9 @@ install_pyarrow <- function(envname = NULL, nightly = FALSE, ...) {
 }
 
 pyarrow_compatible_pointer <- function(ptr) {
-  pa <- reticulate::import("pyarrow")
-  version_string <- pa$`__version__`
-  # remove trailing .devXXX because it won't work with package_version()
-  pyarrow_version <- package_version(gsub("\\.dev.*?$", "", version_string))
-
-  # pyarrow pointers changed in version 7.0.0
-  if (pyarrow_version >= "7.0.0") {
-    return(ptr)
-  } else {
-    return(external_pointer_addr_double(ptr))
-  }
+  # GH-39933: Workaround because there is no built-in way to send a
+  # 64-bit integer to Python from an R object
+  py <- reticulate::import_builtins(convert = FALSE)
+  addr <- external_pointer_addr_character(ptr)
+  py$int(addr)
 }

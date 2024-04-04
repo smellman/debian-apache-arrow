@@ -73,7 +73,6 @@ class OrcScanTask {
         ARROW_ASSIGN_OR_RAISE(
             auto reader,
             OpenORCReader(source, std::make_shared<ScanOptions>(scan_options)));
-        int num_stripes = reader->NumberOfStripes();
 
         auto materialized_fields = scan_options.MaterializedFields();
         // filter out virtual columns
@@ -86,24 +85,21 @@ class OrcScanTask {
           included_fields.push_back(schema->field(match.indices()[0])->name());
         }
 
-        return RecordBatchIterator(
-            Impl{std::move(reader), 0, num_stripes, included_fields});
+        std::shared_ptr<RecordBatchReader> record_batch_reader;
+        ARROW_ASSIGN_OR_RAISE(
+            record_batch_reader,
+            reader->GetRecordBatchReader(scan_options.batch_size, included_fields));
+
+        return RecordBatchIterator(Impl{std::move(record_batch_reader)});
       }
 
       Result<std::shared_ptr<RecordBatch>> Next() {
-        if (i_ == num_stripes_) {
-          return nullptr;
-        }
         std::shared_ptr<RecordBatch> batch;
-        // TODO (https://issues.apache.org/jira/browse/ARROW-14153)
-        // pass scan_options_->batch_size
-        return reader_->ReadStripe(i_++, included_fields_);
+        RETURN_NOT_OK(record_batch_reader_->ReadNext(&batch));
+        return batch;
       }
 
-      std::unique_ptr<arrow::adapters::orc::ORCFileReader> reader_;
-      int i_;
-      int num_stripes_;
-      std::vector<std::string> included_fields_;
+      std::shared_ptr<RecordBatchReader> record_batch_reader_;
     };
 
     return Impl::Make(fragment_->source(),
@@ -145,6 +141,8 @@ class OrcScanTaskIterator {
 };
 
 }  // namespace
+
+OrcFileFormat::OrcFileFormat() : FileFormat(/*default_fragment_scan_options=*/nullptr) {}
 
 Result<bool> OrcFileFormat::IsSupported(const FileSource& source) const {
   RETURN_NOT_OK(source.Open().status());
@@ -200,15 +198,15 @@ Result<RecordBatchGenerator> OrcFileFormat::ScanBatchesAsync(
   return iter_to_gen;
 }
 
-Future<util::optional<int64_t>> OrcFileFormat::CountRows(
+Future<std::optional<int64_t>> OrcFileFormat::CountRows(
     const std::shared_ptr<FileFragment>& file, compute::Expression predicate,
     const std::shared_ptr<ScanOptions>& options) {
   if (ExpressionHasFieldRefs(predicate)) {
-    return Future<util::optional<int64_t>>::MakeFinished(util::nullopt);
+    return Future<std::optional<int64_t>>::MakeFinished(std::nullopt);
   }
   auto self = checked_pointer_cast<OrcFileFormat>(shared_from_this());
   return DeferNotOk(options->io_context.executor()->Submit(
-      [self, file]() -> Result<util::optional<int64_t>> {
+      [self, file]() -> Result<std::optional<int64_t>> {
         ARROW_ASSIGN_OR_RAISE(auto reader, OpenORCReader(file->source()));
         return reader->NumberOfRows();
       }));
