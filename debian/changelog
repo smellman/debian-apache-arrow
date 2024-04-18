@@ -18,6 +18,7 @@ apache-arrow (15.0.2-1) UNRELEASED; urgency=medium
       python-no-jemalloc.patch
   * leave use-debian-jemalloc.patch as a WIP to stop using
     vendored jemalloc
+  * Don't autoclean source while building to help with packaging
 
  -- Diane Trout <diane@ghic.org>  Thu, 04 Apr 2024 17:08:52 -0700
 
