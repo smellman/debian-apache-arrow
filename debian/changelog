@@ -5,6 +5,10 @@ apache-arrow (15.0.2-1) UNRELEASED; urgency=medium
   * Disable packages that seem to not exist now.
     - libarrow-python
     - various plasma-store-server packages
+  * add new packages
+    - libacero{1500,-dev}
+    - pyarrow-dev
+    - python3-pyarrow
 
  -- Diane Trout <diane@ghic.org>  Thu, 04 Apr 2024 17:08:52 -0700
 

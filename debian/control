@@ -92,6 +92,20 @@ Depends:
   ${misc:Depends},
   ${shlibs:Depends},
   libarrow1500 (= ${binary:Version}),
+Description: Apache Acero is a library for processing large streams of data
+ .
+ This package provides C++ library files for the Acero module.
+
+Package: libarrow-dataset1500
+Section: libs
+Architecture: any
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
+Depends:
+  ${misc:Depends},
+  ${shlibs:Depends},
+  libarrow1500 (= ${binary:Version}),
+  libparquet1500 (= ${binary:Version})
 Description: Apache Arrow is a data processing library for analysis
  .
  This package provides C++ library files for Dataset module.
@@ -163,6 +177,18 @@ Depends:
 Description: Apache Arrow is a data processing library for analysis
  .
  This package provides C++ header files.
+
+Package: libarrow-acero-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends:
+  ${misc:Depends},
+  libarrow-dev (= ${binary:Version}),
+  libarrow-acero (= ${binary:Version}),
+Description: Apache Acero is a tool for processing large streams of data
+ .
+ This package provides C++ header files for dataset module.
 
 # Package: libarrow-cuda-dev
 # Section: libdevel
@@ -581,3 +607,26 @@ Recommends: libglib2.0-doc
 Description: Apache Parquet is a columnar storage format
  .
  This package provides documentations.
+
+Package: python3-pyarrow
+Section: python
+Architecture: any
+Milti-Arch: same
+Depends: ${misc:Depends},
+  ${shlib:Depends},
+  ${python3:Depends},
+  libarrow1500 (= ${binary:Version})
+Description: Python interface to the Arrow C++ libraries
+ This library provides a Python API for functionality provided by the
+ Arrow C++ libraries, along with tools for Arrow integration and
+ interoperability with pandas, NumPy, and other software in the Python
+ ecosystem.
+
+Package: pyarrow-dev
+Section: python
+Architecture: any
+Milti-Arch: same
+Depends: ${misc:Depends},${shlib:Depends},${python3:Depends}
+Description: Python interface to the Arrow C++ libraries
+ This provides C headers for interacting with the pyarrow interface to
+ the Arrow C++ libraries.
