@@ -38,8 +38,6 @@ Build-Depends:
   python3-numpy,
   python3-pandas <!nocheck>,
   python3-pytest <!nocheck>,
-  python3-pytest-runner <!nocheck>,
-  python3-pytest-lazy-fixture <!nocheck>,
   python3-setuptools-scm,
   python3-tz <!nocheck>,
   python3-wheel <!nocheck>,
