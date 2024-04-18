@@ -16,6 +16,8 @@ apache-arrow (15.0.2-1) UNRELEASED; urgency=medium
   * Add patches to allow building pyarrow
     - allow-setuptools-8.patch, allow-pytest-8.patch,
       python-no-jemalloc.patch
+  * leave use-debian-jemalloc.patch as a WIP to stop using
+    vendored jemalloc
 
  -- Diane Trout <diane@ghic.org>  Thu, 04 Apr 2024 17:08:52 -0700
 
