@@ -1,7 +1,7 @@
 usr/include/plasma/
-usr/lib/*/cmake/arrow/PlasmaConfig*.cmake
-usr/lib/*/cmake/arrow/PlasmaTargets*.cmake
-usr/lib/*/cmake/arrow/FindPlasma.cmake
+usr/lib/*/cmake/Arrow/PlasmaConfig*.cmake
+usr/lib/*/cmake/Arrow/PlasmaTargets*.cmake
+usr/lib/*/cmake/Arrow/FindPlasma.cmake
 usr/lib/*/libplasma.a
 usr/lib/*/libplasma.so
 usr/lib/*/pkgconfig/plasma.pc
