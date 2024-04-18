@@ -1,0 +1,34 @@
+Author: Diane Trout <diane@ghic.org>
+Description: Remove upstreams setuptools_scm version limit
+Forwarded: No
+
+--- a/python/pyproject.toml
++++ b/python/pyproject.toml
+@@ -19,7 +19,7 @@
+ requires = [
+     "cython >= 0.29.31",
+     "oldest-supported-numpy>=0.14",
+-    "setuptools_scm < 8.0.0",
++    "setuptools_scm",
+     "setuptools >= 40.1.0",
+     "wheel"
+ ]
+--- a/python/requirements-build.txt
++++ b/python/requirements-build.txt
+@@ -1,4 +1,4 @@
+ cython>=0.29.31
+ oldest-supported-numpy>=0.14
+-setuptools_scm<8.0.0
++setuptools_scm
+ setuptools>=38.6.0
+--- a/python/setup.py
++++ b/python/setup.py
+@@ -492,7 +492,7 @@
+                                  'pyarrow/_generated_version.py'),
+         'version_scheme': guess_next_dev_version
+     },
+-    setup_requires=['setuptools_scm < 8.0.0', 'cython >= 0.29.31'] + setup_requires,
++    setup_requires=['setuptools_scm', 'cython >= 0.29.31'] + setup_requires,
+     install_requires=install_requires,
+     tests_require=['pytest', 'pandas', 'hypothesis'],
+     python_requires='>=3.8',

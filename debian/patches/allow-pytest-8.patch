@@ -1,0 +1,24 @@
+Author: Diane Trout <diane@ghic.org>
+Description: Remove upstreams pytest version limit
+Forwarded: No
+
+--- a/python/requirements-test.txt
++++ b/python/requirements-test.txt
+@@ -1,5 +1,5 @@
+ cffi
+ hypothesis
+ pandas
+-pytest<8
++pytest
+ pytz
+--- a/python/requirements-wheel-test.txt
++++ b/python/requirements-wheel-test.txt
+@@ -1,7 +1,7 @@
+ cffi
+ cython
+ hypothesis
+-pytest<8
++pytest
+ pytz
+ tzdata; sys_platform == 'win32'
+ 
