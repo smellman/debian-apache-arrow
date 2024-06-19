@@ -4,59 +4,29 @@ Upstream-Contact: <dev@arrow.apache.org>
 Source: https://dist.apache.org/repos/dist/release/arrow/
 
 Files: *
+Copyright: (C) 2002-2017 Jason Evans <jasone@canonware.com>.
+Copyright: (C) 2007-2012 Mozilla Foundation.
+Copyright: (C) 2009-2017 Facebook, Inc.
+Copyright: (C) 2011-12, Dynamic NDArray Developers
+Copyright: (c) 2005-2017, NumPy Developers.
+Copyright: (c) 2008-2011 AQR Capital Management, LLC
+Copyright: (c) 2009 The Go Authors.
+Copyright: (c) 2011-2012, Lambda Foundry, Inc. and PyData Development Team
+Copyright: 2012 Cloudera, Inc.
+Copyright: 2013 Daniel Lemire
+Copyright: 2014 Google Inc.
+Copyright: 2015 Microsoft Corporation.
+Copyright: 2015 The TensorFlow Authors.
+Copyright: 2016 Cloudera Inc.
 Copyright: 2016 The Apache Software Foundation
+Copyright: 2016 manylinux
+Copyright: Boost project contributors
 License: Apache-2.0
-
-Files: src/plasma/fling.cc
-       src/plasma/fling.h
-Copyright: 2013 Sharvil Nanavati
-License: Apache-2.0
-
-Files: cpp/src/plasma/thirdparty/ae/*
-Copyright: 2006-2012, Salvatore Sanfilippo <antirez at gmail dot com>
-           2009 Harish Mallipeddi - harish.mallipeddi@gmail.com
-           2012, Joyent, Inc.
-License: Redis-BSD-3-clause
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
+Comment: There were many cases of code being included without
+ specifying where it was located, All those cases ended up here.
  .
-  * Redistributions of source code must retain the above copyright notice,
-    this list of conditions and the following disclaimer.
-  * Redistributions in binary form must reproduce the above copyright
-    notice, this list of conditions and the following disclaimer in the
-    documentation and/or other materials provided with the distribution.
-  * Neither the name of Redis nor the names of its contributors may be used
-    to endorse or promote products derived from this software without
-    specific prior written permission.
- .
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- POSSIBILITY OF SUCH DAMAGE.
-
-Files: cpp/src/plasma/thirdparty/dlmalloc.c
-Copyright: Doug Lea
-License: CC0
- This is a version (aka dlmalloc) of malloc/free/realloc written by
- Doug Lea and released to the public domain, as explained at
- http://creativecommons.org/publicdomain/zero/1.0/ Send questions,
- comments, complaints, performance data, etc to dl@cs.oswego.edu
-
-Files: cpp/src/plasma/common.cc
-Copyright: Austin Appleby (aappleby (AT) gmail)
-License: MIT
- All code is released to the public domain. For business purposes, Murmurhash is
- under the MIT license.
-Comment:
- Some portions of this file are derived from code in the MurmurHash project.
- https://sites.google.com/site/murmurhash/
+ The more definitive source for copyright information is
+ LICENSE.txt
 
 Files: cpp/src/arrow/util
 Copyright: 2013 The Chromium Authors
@@ -92,70 +62,147 @@ Comment:
  project, copyright (c) Google inc and (c) The Chromium Authors and licensed
  under the Apache 2.0 License or the under the 3-clause BSD license.
 
-Files: cpp/src/arrow/util/bpacking64_codegen.py
-       cpp/src/arrow/util/bpacking64_default.h
-       cpp/src/arrow/util/bpacking_default.h
-Copyright: 2013 Daniel Lemire
-License: Apache-2.0
-Comment:
- (Upstream:) This project includes code from Daniel Lemire's FrameOfReference
- project. https://github.com/lemire/FrameOfReference
-
-
-# TODO
-
-
-
-Files: TODO for "This product includes software from the SFrame project"
-Copyright: 2015 Dato, Inc.
-           2009 Carnegie Mellon University.
-License: BSD-3-clause
-
-Files: TODO for "This product includes software from the Numpy project"
-Copyright: 1995, 1996, 1997 Jim Hugunin, hugunin@mit.edu
-           2005 Travis E. Oliphant oliphant@ee.byu.edu Brigham Young University
-License: BSD-3-clause
-
-Files: TODO for "This product includes software from the Feather project"
-Copyright: TODO
-License: Apache-2.0
-
-Files: TODO for "This product includes software from the DyND project"
-Copyright: TODO
-License: BSD-2-clause
-
-Files: TODO for "This product includes software from the LLVM project"
-Copyright: 2003-2007 University of Illinois at Urbana-Champaign.
-License: U-OF-I-BSD-LIKE
-
-Files: TODO for "This product includes software from the google-lint project"
-Copyright: 2009 Google Inc. All rights reserved.
-License: BSD-3-clause
-
-Files: TODO for "This product includes software from the mman-win32 project"
-Copyright: 2010 kutuzov.viktor.84
+Files: ci/scripts/util_wait_for_it.sh
+Copyright: (c) 2016 Giles Hall
 License: MIT
 
-Files: TODO for "This product includes software from the LevelDB project"
-Copyright: 2011 The LevelDB Authors. All rights reserved.
-License: BSD-3-clause
+Files: r/configure
+Copyright: (c) 2017, Jeroen Ooms and Jim Hester
+License: MIT
 
-Files: TODO for "This product includes software from the CMake project"
-Copyright: 2001-2009 Kitware, Inc.
-           2012-2014 Continuum Analytics, Inc.
-License: BSD-3-clause
+Files: cpp/src/arrow/util/logging.cc
+       cpp/src/arrow/util/logging.h and
+       cpp/src/arrow/util/logging_test.cc
+Copyright: (c) 2016 Ray Project (https://github.com/ray-project/ray)
+License: Apache-2.0
 
-Files: TODO for "This product includes software from https://github.com/matthew-brett/multibuild"
-Copyright: 2013-2016, Matt Terry and Matthew Brett; all rights reserved.
+Files: cpp/src/arrow/vendored/datetime/date.h
+       cpp/src/arrow/vendored/datetime/tz.h
+       cpp/src/arrow/vendored/datetime/tz_private.h
+       cpp/src/arrow/vendored/datetime/ios.h
+       cpp/src/arrow/vendored/datetime/ios.mm
+       cpp/src/arrow/vendored/datetime/tz.cpp
+Copyright: (c) 2015, 2016, 2017 Howard Hinnant
+Copyright: (c) 2016 Adrian Colomitchi
+Copyright: (c) 2017 Florian Dang
+Copyright: (c) 2017 Paul Thompson
+Copyright: (c) 2018 Tomasz Kamiński
+License: MIT
+
+Files: cpp/src/arrow/util/utf8.h
+Copyright: (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
+License: MIT
+
+Files: cpp/src/arrow/vendored/xxhash
+Copyright: (c) 2012-2014, Yann Collet
+License: BSD-2-Clause
+
+Files: cpp/src/arrow/vendored/double-conversion/
+Copyright: 2006-2011, the V8 project authors
+License: BSD-3-clause-google
+
+Files: cpp/src/arrow/vendored/uriparser/
+Copyright: (C) 2007, Weijia Song <songweijia@gmail.com>
+Copyright: (C) 2007, Sebastian Pipping <sebastian@pipping.org>
+License: BSD-3-clause-template
+
+Files: dev/tasks/conda-recipes
+Copyright: (c) 2015-2018, conda-forge
+License: BSD-3-clause-contributors
+
+Files: cpp/src/arrow/vendored/utfcpp/
+Copyright: 2006-2018 Nemanja Trifunovic
+License: MIT
+
+Files: cpp/build-support/cpplint.py
+Copyright: 2009 Google Inc
+License: BSD-3-clause-google
+
+Files: python/pyarrow/includes/common.pxd
+Copyright: (c) 2019 Omer Ozarslan
+License: MIT
+
+Files: dev/archery/
+Copyright: 2019 RStudio, Inc.
 License: BSD-2-clause
 
-Files: TODO for "This product includes software from the Ibis project"
-Copyright: 2015 Cloudera, Inc.
+Files: cpp/src/arrow/util/cpu-info.cc
+Copyright: (c) 2009 - 2013 by the mingw-w64 project
+License: Zope Public License (ZPL) Version 2.1.
+Comment: I couldn't find the source in the project
+
+Files: cpp/src/arrow/result.h
+Copyright: (c)  Copyright 2017 Asylo authors
 License: Apache-2.0
 
-Files: TODO for "This product includes code from Apache Kudu"
-Copyright: 2016 The Apache Software Foundation
+Files: cpp/src/arrow/result.h
+       cpp/src/arrow/util/bit_stream_utils.h
+Copyright: 2008 Google Inc.  All rights reserved.
+License: BSD-3-clause-google
+Comment: It seems that result.h was includes code from 2 projects
+
+Files: ci/scripts/PKGBUILD
+       ci/scripts/r_windows_build.sh
+Copyright: Copyright (c) 2013 - 2019, Алексей and Jeroen Ooms.
+License: BSD-3-clause
+
+Files: dev/tasks/homebrew-formulae/apache-arrow.rb
+Copyright: (c) 2009-present, Homebrew contributors
+License: BSD-2-clause
+
+Files: cpp/src/arrow/vendored/base64.cpp
+Copyright: (C) 2004-2017 René Nyffenegger
+License: zlib
+
+Files: cpp/src/arrow/vendored/ProducerConsumerQueue.h
+Copyright: Copyright (c) Facebook, Inc. and its affiliates.
 License: Apache-2.0
+
+Files: cpp/src/arrow/vendored/musl/strptime.c
+Copyright: © 2005-2020 Rich Felker, et al.
+License: MIT
+
+Files: cpp/cmake_modules/BuildUtils.cmake
+Copyright: (c) 2019 Cristian Adam
+License: MIT
+
+Files: cpp/src/arrow/vendored/portable-snippets/
+Copyright: unknown
+License: CC0-1.0
+
+Files: cpp/src/arrow/vendored/fast_float/
+Copyright: unknown
+License: Apache-2.0
+
+Files: python/pyarrow/vendored/docscrape.py
+Copyright: Copyright (c) 2005-2023, NumPy Developers <numpy-dev@numpy.org>
+License: BSD-2-clause or Apache-2.0
+
+Files: python/pyarrow/vendored/version.py
+Copyright: Donald Stufft and individual contributors
+License: BSD-2-clause or Apache-2.0
+
+Files: cpp/src/arrow/vendored/pcg
+Copyright: Copyright 2014-2019 Melissa O'Neill <oneill@pcg-random.org>,
+           and the PCG Project contributors.
+License: MIT or Apache-2.0
+
+Files: r/R/dplyr-count-tally.R (some portions)
+Copyright: Copyright (c) 2013-2019 RStudio and others.
+License: MIT
+
+Files: ci/conan/
+Copyright: (c) 2019 Conan.io
+License: MIT
+
+Files: .github/actions/sync-nightlies/action.yml
+Copyright: Copyright (c) 2020 Joshua Piper
+License: MIT
+
+Files: .github/actions/sync-nightlies/action.yml
+Copyright: (c) 2019-2022 Contention
+Copyright: (c) 2019-2022 Burnett01
+License: MIT
 
 License: Apache-2.0
  Licensed to the Apache Software Foundation (ASF) under one or more
@@ -227,6 +274,34 @@ License: BSD-2-clause
  WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  POSSIBILITY OF SUCH DAMAGE.
 
+License: BSD-3-clause-google
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are
+ met:
+ .
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+     * Redistributions in binary form must reproduce the above
+       copyright notice, this list of conditions and the following
+       disclaimer in the documentation and/or other materials provided
+       with the distribution.
+     * Neither the name of Google Inc. nor the names of its
+       contributors may be used to endorse or promote products derived
+       from this software without specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
 License: U-OF-I-BSD-LIKE
  ==============================================================================
  LLVM Release License
@@ -272,6 +347,64 @@ License: U-OF-I-BSD-LIKE
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH THE
  SOFTWARE.
 
+License: BSD-3-clause-template
+ Redistribution  and use in source and binary forms, with or without
+ modification,  are permitted provided that the following conditions
+ are met:
+ .
+     * Redistributions   of  source  code  must  retain  the   above
+       copyright  notice, this list of conditions and the  following
+       disclaimer.
+ .
+     * Redistributions  in  binary  form must  reproduce  the  above
+       copyright  notice, this list of conditions and the  following
+       disclaimer   in  the  documentation  and/or  other  materials
+       provided with the distribution.
+ .
+     * Neither  the name of the <ORGANIZATION> nor the names of  its
+       contributors  may  be  used to endorse  or  promote  products
+       derived  from  this software without specific  prior  written
+       permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ "AS  IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT  NOT
+ LIMITED  TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND  FITNESS
+ FOR  A  PARTICULAR  PURPOSE ARE DISCLAIMED. IN NO EVENT  SHALL  THE
+ COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ INCIDENTAL,    SPECIAL,   EXEMPLARY,   OR   CONSEQUENTIAL   DAMAGES
+ (INCLUDING,  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ SERVICES;  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ STRICT  LIABILITY,  OR  TORT (INCLUDING  NEGLIGENCE  OR  OTHERWISE)
+ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+ OF THE POSSIBILITY OF SUCH DAMAGE.
+
+License: BSD-3-clause-contributors
+ Redistribution and use in source and binary forms, with or without modification,
+ are permitted provided that the following conditions are met:
+ .
+ 1. Redistributions of source code must retain the above copyright notice, this
+    list of conditions and the following disclaimer.
+ .
+ 2. Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+ .
+ 3. Neither the name of the copyright holder nor the names of its contributors
+    may be used to endorse or promote products derived from this software without
+    specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+ TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 License: MIT
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -290,3 +423,24 @@ License: MIT
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
+
+License: ZLIB
+ This source code is provided 'as-is', without any express or implied
+ warranty. In no event will the author be held liable for any damages arising
+ from the use of this software.
+ .
+ Permission is granted to anyone to use this software for any purpose, including
+ commercial applications, and to alter it and redistribute it freely, subject to
+ the following restrictions:
+ .
+ 1. The origin of this source code must not be misrepresented; you must not
+    claim that you wrote the original source code. If you use this source code
+    in a product, an acknowledgment in the product documentation would be
+    appreciated but is not required.
+ .
+ 2. Altered source versions must be plainly marked as such, and must not be
+    misrepresented as being the original source code.
+ .
+ 3. This notice may not be removed or altered from any source distribution.
+ .
+ René Nyffenegger rene.nyffenegger@adp-gmbh.ch
