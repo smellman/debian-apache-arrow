@@ -25,6 +25,7 @@ apache-arrow (15.0.2-1) UNRELEASED; urgency=medium
   * Build and install python component
   * Adjust cmake build settings
   * Tell pybuild to use cmake instead of setup.py
+  * Configure salsa-ci.yml
 
  -- Diane Trout <diane@ghic.org>  Thu, 04 Apr 2024 17:08:52 -0700
 
