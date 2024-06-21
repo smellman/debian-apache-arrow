@@ -609,7 +609,7 @@ Description: Apache Parquet is a columnar storage format
 Package: python3-pyarrow
 Section: python
 Architecture: any
-Milti-Arch: same
+Multi-Arch: same
 Depends: ${misc:Depends},
   ${shlib:Depends},
   ${python3:Depends},
@@ -623,7 +623,7 @@ Description: Python interface to the Arrow C++ libraries
 Package: pyarrow-dev
 Section: python
 Architecture: any
-Milti-Arch: same
+Multi-Arch: same
 Depends: ${misc:Depends},${shlib:Depends},${python3:Depends}
 Description: Python interface to the Arrow C++ libraries
  This provides C headers for interacting with the pyarrow interface to
