@@ -1,0 +1,2 @@
+Tests: test-pyarrow
+Depends: python3-pyarrow, python3-pytest

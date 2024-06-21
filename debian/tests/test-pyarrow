@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+
+for py in $(py3versions -d)
+do
+  cd "$AUTOPKGTEST_TMP"
+  echo "Testing with $py:"
+  $py -m pytest -v --pyargs pyarrow
+done
