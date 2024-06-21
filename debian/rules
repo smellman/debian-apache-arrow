@@ -70,6 +70,13 @@ override_dh_auto_build:
 	  -Darrow_cpp_build_type=$(BUILD_TYPE)		\
 	  -Darrow_cpp_build_dir=../cpp_build		\
 	  -Dgtk_doc=true
+
+	#install C++ version
+	dh_auto_install				\
+	  --sourcedirectory=cpp			\
+	  --builddirectory=cpp_build
+
+	# Build glib version
 	env							\
 	  LD_LIBRARY_PATH=$(CURDIR)/cpp_build/$(BUILD_TYPE)	\
 	    dh_auto_build					\
@@ -77,14 +84,6 @@ override_dh_auto_build:
 	      --builddirectory=c_glib_build			\
 	      --buildsystem=meson+ninja
 
-	# as far as I can tell pyarrow needs the installed directory
-	# structure to build
-	dh_auto_install				\
-	  --sourcedirectory=cpp			\
-	  --builddirectory=cpp_build
-	Arrow_DIR=$(CURDIR)/debian/tmp/usr dh_auto_build \
-	  --buildsystem=pybuild \
-	  --sourcedirectory=python
 
 override_dh_auto_install:
 	# install glib version
@@ -97,10 +96,35 @@ override_dh_auto_install:
 	  --sourcedirectory=cpp			\
 	  --builddirectory=cpp_build
 
-	dh_auto_install \
+	# clean up cpp version to reduce disk use
+	dh_auto_clean				\
+	  --sourcedirectory=cpp			\
+	  --builddirectory=cpp_build
+
+	# clean up glib version to reduce disk use
+	dh_auto_clean				\
+	  --sourcedirectory=c_glib		\
+	  --builddirectory=c_glib_build		\
+	  --buildsystem=meson+ninja
+
+	Arrow_DIR=$(CURDIR)/debian/tmp/usr dh_auto_configure \
+	  --sourcedirectory=python \
+	  --builddirectory=python \
+	  --buildsystem=pybuild \
+	  --
+	  $(CMAKE_OPTIONS) \
+	  -DCMAKE_INSTALL_INCLUDEDIR=$(CURDIR)/debian/tmp/usr/include
+
+	Arrow_DIR=$(CURDIR)/debian/tmp/usr dh_auto_install \
 	  --buildsystem=pybuild \
 	  --sourcedirectory=python
+
 	rm -rf debian/tmp/usr/lib/python*/dist-packages/.pytest_cache/
+	rm -rf debian/tmp/usr/lib/python*/dist-packages/pyarrow/__pycache__
+	# I don't know why the python build is installing these.
+	# I couldn't find a cmake option to turn it off.
+	rm -rf debian/tmp/usr/lib/python*/dist-packages/src/
+	rm -rf debian/tmp/usr/lib/python*/dist-packages/include/
 
 override_dh_auto_test:
 	# pass
