@@ -60,6 +60,8 @@ override_dh_auto_build:
 	dh_auto_build				\
 	  --sourcedirectory=cpp			\
 	  --builddirectory=cpp_build
+
+	# Configure glib now that the primary library is built
 	dh_auto_configure				\
 	  --sourcedirectory=c_glib			\
 	  --builddirectory=c_glib_build			\
@@ -85,6 +87,7 @@ override_dh_auto_build:
 	  --sourcedirectory=python
 
 override_dh_auto_install:
+	# install glib version
 	dh_auto_install				\
 	  --sourcedirectory=c_glib		\
 	  --builddirectory=c_glib_build		\
