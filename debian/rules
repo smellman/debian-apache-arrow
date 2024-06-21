@@ -17,17 +17,8 @@ PYBUILD_CONFIGURE_ARGS=-DCMAKE_INSTALL_INCLUDEDIR=$(CURDIR)/debian/tmp/libarrow-
 # using files installed into debian/tmp
 export PYBUILD_TEST_ARGS="-m not cython"
 
-%:
-	dh $@ --with gir
-
-override_dh_auto_configure:
-	dh_auto_configure						\
-	  --sourcedirectory=cpp					\
-	  --builddirectory=cpp_build			\
-	  --buildsystem=cmake+ninja				\
-	  --									\
-	  -DARROW_CUDA=OFF						\
-	  -DARROW_CSV=ON 						\
+CMAKE_OPTIONS:=	-DARROW_CUDA=OFF					\
+	  -DARROW_CSV=ON 					\
 	  -DARROW_COMPUTE=ON 					\
 	  -DARROW_DATASET=ON 					\
 	  -DARROW_DEPENDENCY_SOURCE=SYSTEM			\
@@ -52,6 +43,18 @@ override_dh_auto_configure:
 	  -DARROW_WITH_ZLIB=ON					\
 	  -DARROW_WITH_ZSTD=ON					\
 	  -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)			\
+
+
+%:
+	dh $@ --with gir,python3
+
+override_dh_auto_configure:
+	dh_auto_configure					\
+	  --sourcedirectory=cpp					\
+	  --builddirectory=cpp_build				\
+	  --buildsystem=cmake+ninja				\
+	  --							\
+	  $(CMAKE_OPTIONS)
 
 override_dh_auto_build:
 	dh_auto_build				\
