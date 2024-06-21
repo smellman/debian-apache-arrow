@@ -10,6 +10,8 @@ export DEB_BUILD_MAINT_OPTIONS=reproducible=-timeless
 
 BUILD_TYPE=release
 PYBUILD_NAME=pyarrow
+PYBUILD_SYSTEM=cmake
+PYBUILD_CONFIGURE_ARGS=-DCMAKE_INSTALL_INCLUDEDIR=$(CURDIR)/debian/tmp/libarrow-dev/usr/include
 # Skipping cython tests because it builds modules and needs to
 # find an arrow library to link against, which doesnI't work
 # using files installed into debian/tmp
