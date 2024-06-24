@@ -10,14 +10,23 @@ export DEB_BUILD_MAINT_OPTIONS=reproducible=-timeless
 
 BUILD_TYPE=release
 PYBUILD_NAME=pyarrow
-PYBUILD_SYSTEM=cmake
-PYBUILD_CONFIGURE_ARGS=-DCMAKE_INSTALL_INCLUDEDIR=$(CURDIR)/debian/tmp/libarrow-dev/usr/include
+#PYBUILD_SYSTEM=cmake
+#PYBUILD_CONFIGURE_ARGS=-DCMAKE_INSTALL_INCLUDEDIR=$(CURDIR)/debian/tmp/libarrow-dev/usr/include
 # Skipping cython tests because it builds modules and needs to
 # find an arrow library to link against, which doesnI't work
 # using files installed into debian/tmp
 export PYBUILD_TEST_ARGS="-m not cython"
 
-CMAKE_OPTIONS:=	-DARROW_CUDA=OFF					\
+%:
+	dh $@ --with gir,python3
+
+override_dh_auto_configure:
+	dh_auto_configure					\
+	  --sourcedirectory=cpp					\
+	  --builddirectory=cpp_build				\
+	  --buildsystem=cmake+ninja				\
+	  --							\
+	  -DARROW_CUDA=OFF				\
 	  -DARROW_CSV=ON 					\
 	  -DARROW_COMPUTE=ON 					\
 	  -DARROW_DATASET=ON 					\
@@ -42,25 +51,17 @@ CMAKE_OPTIONS:=	-DARROW_CUDA=OFF					\
 	  -DARROW_SNAPPY_USE_SHARED=ON				\
 	  -DARROW_WITH_ZLIB=ON					\
 	  -DARROW_WITH_ZSTD=ON					\
+	  -DTHRIFT_DIR=cpp/cmake_modules			\
 	  -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)			\
 
-
-%:
-	dh $@ --with gir,python3
-
-override_dh_auto_configure:
-	dh_auto_configure					\
-	  --sourcedirectory=cpp					\
-	  --builddirectory=cpp_build				\
-	  --buildsystem=cmake+ninja				\
-	  --							\
-	  $(CMAKE_OPTIONS)
-
 override_dh_auto_build:
+	echo " *** BUILD CPP *** "
 	dh_auto_build				\
 	  --sourcedirectory=cpp			\
-	  --builddirectory=cpp_build
+	  --builddirectory=cpp_build		\
+	  --buildsystem=cmake+ninja
 
+	echo " *** CONFIGURE GLIB *** "
 	# Configure glib now that the primary library is built
 	dh_auto_configure				\
 	  --sourcedirectory=c_glib			\
@@ -71,11 +72,7 @@ override_dh_auto_build:
 	  -Darrow_cpp_build_dir=../cpp_build		\
 	  -Dgtk_doc=true
 
-	#install C++ version
-	dh_auto_install				\
-	  --sourcedirectory=cpp			\
-	  --builddirectory=cpp_build
-
+	echo " *** BUILD GLIB *** "
 	# Build glib version
 	env							\
 	  LD_LIBRARY_PATH=$(CURDIR)/cpp_build/$(BUILD_TYPE)	\
@@ -84,22 +81,25 @@ override_dh_auto_build:
 	      --builddirectory=c_glib_build			\
 	      --buildsystem=meson+ninja
 
+#	echo " *** INSTALL CPP *** "
+#	# Install it
+	dh_auto_install				\
+	   --sourcedirectory=cpp		\
+	   --builddirectory=cpp_build		\
+	   --buildsystem=cmake+ninja
+
 
 override_dh_auto_install:
-	# install glib version
 	dh_auto_install				\
-	  --sourcedirectory=c_glib		\
-	  --builddirectory=c_glib_build		\
-	  --buildsystem=meson+ninja
+	   --sourcedirectory=cpp		\
+	   --builddirectory=cpp_build		\
+	   --buildsystem=cmake+ninja
 
-	dh_auto_install				\
-	  --sourcedirectory=cpp			\
-	  --builddirectory=cpp_build
-
-	# clean up cpp version to reduce disk use
-	dh_auto_clean				\
-	  --sourcedirectory=cpp			\
-	  --builddirectory=cpp_build
+	echo " *** INSTALL PYTHON *** "
+	env Arrow_DIR=$(CURDIR)/debian/tmp/usr dh_auto_install \
+	  --buildsystem=pybuild \
+	  --sourcedirectory=python \
+	  --builddirectory=python
 
 	# clean up glib version to reduce disk use
 	dh_auto_clean				\
@@ -107,17 +107,13 @@ override_dh_auto_install:
 	  --builddirectory=c_glib_build		\
 	  --buildsystem=meson+ninja
 
-	Arrow_DIR=$(CURDIR)/debian/tmp/usr dh_auto_configure \
-	  --sourcedirectory=python \
-	  --builddirectory=python \
-	  --buildsystem=pybuild \
-	  --
-	  $(CMAKE_OPTIONS) \
-	  -DCMAKE_INSTALL_INCLUDEDIR=$(CURDIR)/debian/tmp/usr/include
-
-	Arrow_DIR=$(CURDIR)/debian/tmp/usr dh_auto_install \
-	  --buildsystem=pybuild \
-	  --sourcedirectory=python
+	# cpp library is installed and cleaned in install step
+	# to reduce build disk usage.
+	# #install C++ version
+	dh_auto_install				\
+	   --sourcedirectory=cpp		\
+	   --builddirectory=cpp_build		\
+	   --buildsystem=cmake+ninja
 
 	rm -rf debian/tmp/usr/lib/python*/dist-packages/.pytest_cache/
 	rm -rf debian/tmp/usr/lib/python*/dist-packages/pyarrow/__pycache__
@@ -127,11 +123,24 @@ override_dh_auto_install:
 	rm -rf debian/tmp/usr/lib/python*/dist-packages/include/
 
 override_dh_auto_test:
-	# pass
+#	# pass
+	Arrow_DIR=$(CURDIR)/debian/tmp/usr \
 	LD_LIBRARY_PATH=$(CURDIR)/debian/tmp/usr/lib/x86_64-linux-gnu \
 	dh_auto_test \
 	  --buildsystem=pybuild \
-	  --sourcedirectory python
+	  --sourcedirectory=python
+
+override_dh_auto_clean:
+	# clean up cpp version to reduce disk, needs to be after
+	# installing glib version because of dependencies
+	dh_auto_clean				\
+	  --sourcedirectory=cpp			\
+	  --builddirectory=cpp_build
+
+	dh_auto_clean				\
+	  --buildsystem=pybuild			\
+	  --sourcedirectory=python		\
+	  --builddirectory=python
 
 override_dh_missing:
 	dh_missing --fail-missing
