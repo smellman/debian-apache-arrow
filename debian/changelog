@@ -1,5 +1,6 @@
-apache-arrow (15.0.2-1) UNRELEASED; urgency=medium
+apache-arrow (15.0.2-1) unstable; urgency=medium
 
+  [ Diane Trout ]
   * New upstream release
   * Put documentation files in most core library
   * Disable packages that seem to not exist now.
@@ -27,7 +28,7 @@ apache-arrow (15.0.2-1) UNRELEASED; urgency=medium
   * Tell pybuild to use cmake instead of setup.py
   * Configure salsa-ci.yml
 
- -- Diane Trout <diane@ghic.org>  Thu, 04 Apr 2024 17:08:52 -0700
+ -- Taro Matsuzawa <btm@tech.email.ne.jp>  Sun, 13 Apr 2025 14:06:51 +0900
 
 apache-arrow (7.0.0-1) UNRELEASED; urgency=medium
 
