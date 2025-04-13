@@ -2,67 +2,71 @@
 # -*- makefile-gmake -*-
 #
 # Uncomment this to turn on verbose mode.
-export DH_VERBOSE=1
+#export DH_VERBOSE=1
 # This has to be exported to make some magic below work.
 export DH_OPTIONS
 
 export DEB_BUILD_MAINT_OPTIONS=reproducible=-timeless
 
 BUILD_TYPE=release
-PYBUILD_NAME=pyarrow
-#PYBUILD_SYSTEM=cmake
-#PYBUILD_CONFIGURE_ARGS=-DCMAKE_INSTALL_INCLUDEDIR=$(CURDIR)/debian/tmp/libarrow-dev/usr/include
-# Skipping cython tests because it builds modules and needs to
-# find an arrow library to link against, which doesnI't work
-# using files installed into debian/tmp
-export PYBUILD_TEST_ARGS="-m not cython"
 
 %:
-	dh $@ --with gir,python3
+	dh $@ --with gir
 
 override_dh_auto_configure:
+	code_name="$$(. /etc/os-release &&			\
+                        echo $${VERSION_CODENAME})";		\
+	if [ "$${code_name}" = "focal" ]; then			\
+	  ARROW_AZURE=OFF;					\
+	else							\
+	  ARROW_AZURE=ON;					\
+	fi;							\
+	if dpkg -l nvidia-cuda-toolkit > /dev/null 2>&1; then	\
+	  ARROW_CUDA=ON;					\
+	else							\
+	  ARROW_CUDA=OFF;					\
+	fi;							\
 	dh_auto_configure					\
 	  --sourcedirectory=cpp					\
 	  --builddirectory=cpp_build				\
 	  --buildsystem=cmake+ninja				\
 	  --							\
-	  -DARROW_CUDA=OFF				\
-	  -DARROW_CSV=ON 					\
-	  -DARROW_COMPUTE=ON 					\
-	  -DARROW_DATASET=ON 					\
-	  -DARROW_DEPENDENCY_SOURCE=SYSTEM			\
-	  -DARROW_JSON=ON 					\
+	  -DARROW_AZURE=$${ARROW_AZURE}				\
+	  -DARROW_BUILD_UTILITIES=ON				\
+	  -DARROW_COMPUTE=ON					\
+	  -DARROW_CSV=ON					\
+	  -DARROW_CUDA=$${ARROW_CUDA}				\
+	  -DARROW_DATASET=ON					\
 	  -DARROW_FILESYSTEM=ON					\
-	  -DARROW_FLIGHT=OFF					\
-	  -DARROW_GANDIVA=OFF    				\
-	  -DARROW_JEMALLOC=OFF					\
-	  -DARROW_MIMALLOC=OFF					\
-	  -DARROW_ORC=OFF					\
-	  -DARROW_OPENSSL_USE_SHARED=ON				\
+	  -DARROW_FLIGHT=ON					\
+	  -DARROW_FLIGHT_SQL=ON					\
+	  -DARROW_GANDIVA=ON					\
+	  -DARROW_GCS=ON					\
+	  -DARROW_HDFS=ON					\
+	  -DARROW_JSON=ON					\
+	  -DARROW_MIMALLOC=ON					\
+	  -DARROW_ORC=ON					\
+	  -DARROW_PACKAGE_KIND=deb				\
 	  -DARROW_PARQUET=ON					\
-	  -DARROW_S3=OFF					\
+	  -DARROW_S3=ON						\
 	  -DARROW_USE_CCACHE=OFF				\
+	  -DARROW_USE_MOLD=ON					\
 	  -DARROW_WITH_BROTLI=ON				\
-	  -DARROW_BROTLI_USE_SHARED=ON				\
 	  -DARROW_WITH_BZ2=ON					\
-	  -DBZip2_SOURCE=SYSTEM					\
 	  -DARROW_WITH_LZ4=ON					\
 	  -DARROW_WITH_SNAPPY=ON				\
-	  -DARROW_SNAPPY_USE_SHARED=ON				\
 	  -DARROW_WITH_ZLIB=ON					\
 	  -DARROW_WITH_ZSTD=ON					\
-	  -DTHRIFT_DIR=cpp/cmake_modules			\
 	  -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)			\
+	  -DCUDAToolkit_ROOT=/usr				\
+	  -DFETCHCONTENT_FULLY_DISCONNECTED=OFF			\
+	  -DPARQUET_BUILD_EXECUTABLES=ON			\
+	  -DPARQUET_REQUIRE_ENCRYPTION=ON
 
 override_dh_auto_build:
-	echo " *** BUILD CPP *** "
 	dh_auto_build				\
 	  --sourcedirectory=cpp			\
-	  --builddirectory=cpp_build		\
-	  --buildsystem=cmake+ninja
-
-	echo " *** CONFIGURE GLIB *** "
-	# Configure glib now that the primary library is built
+	  --builddirectory=cpp_build
 	dh_auto_configure				\
 	  --sourcedirectory=c_glib			\
 	  --builddirectory=c_glib_build			\
@@ -70,10 +74,8 @@ override_dh_auto_build:
 	  --						\
 	  -Darrow_cpp_build_type=$(BUILD_TYPE)		\
 	  -Darrow_cpp_build_dir=../cpp_build		\
-	  -Dgtk_doc=true
-
-	echo " *** BUILD GLIB *** "
-	# Build glib version
+	  -Ddoc=true					\
+	  -Dvapi=true
 	env							\
 	  LD_LIBRARY_PATH=$(CURDIR)/cpp_build/$(BUILD_TYPE)	\
 	    dh_auto_build					\
@@ -81,77 +83,42 @@ override_dh_auto_build:
 	      --builddirectory=c_glib_build			\
 	      --buildsystem=meson+ninja
 
-#	echo " *** INSTALL CPP *** "
-#	# Install it
-	dh_auto_install				\
-	   --sourcedirectory=cpp		\
-	   --builddirectory=cpp_build		\
-	   --buildsystem=cmake+ninja
-
-
 override_dh_auto_install:
 	dh_auto_install				\
-	   --sourcedirectory=cpp		\
-	   --builddirectory=cpp_build		\
-	   --buildsystem=cmake+ninja
-
-	echo " *** INSTALL PYTHON *** "
-	env Arrow_DIR=$(CURDIR)/debian/tmp/usr dh_auto_install \
-	  --buildsystem=pybuild \
-	  --sourcedirectory=python \
-	  --builddirectory=python
-
-	# clean up glib version to reduce disk use
+	  --sourcedirectory=c_glib		\
+	  --builddirectory=c_glib_build		\
+	  --buildsystem=meson+ninja
+	# Remove built files to reduce disk usage
 	dh_auto_clean				\
 	  --sourcedirectory=c_glib		\
 	  --builddirectory=c_glib_build		\
 	  --buildsystem=meson+ninja
 
-	# cpp library is installed and cleaned in install step
-	# to reduce build disk usage.
-	# #install C++ version
 	dh_auto_install				\
-	   --sourcedirectory=cpp		\
-	   --builddirectory=cpp_build		\
-	   --buildsystem=cmake+ninja
-
-	rm -rf debian/tmp/usr/lib/python*/dist-packages/.pytest_cache/
-	rm -rf debian/tmp/usr/lib/python*/dist-packages/pyarrow/__pycache__
-	# I don't know why the python build is installing these.
-	# I couldn't find a cmake option to turn it off.
-	rm -rf debian/tmp/usr/lib/python*/dist-packages/src/
-	rm -rf debian/tmp/usr/lib/python*/dist-packages/include/
-
-override_dh_auto_test:
-#	# pass
-	Arrow_DIR=$(CURDIR)/debian/tmp/usr \
-	LD_LIBRARY_PATH=$(CURDIR)/debian/tmp/usr/lib/x86_64-linux-gnu \
-	dh_auto_test \
-	  --buildsystem=pybuild \
-	  --sourcedirectory=python
-
-override_dh_auto_clean:
-	# clean up cpp version to reduce disk, needs to be after
-	# installing glib version because of dependencies
+	  --sourcedirectory=cpp			\
+	  --builddirectory=cpp_build
+	# Remove built files to reduce disk usage
 	dh_auto_clean				\
 	  --sourcedirectory=cpp			\
 	  --builddirectory=cpp_build
 
-	dh_auto_clean				\
-	  --buildsystem=pybuild			\
-	  --sourcedirectory=python		\
-	  --builddirectory=python
-
-override_dh_missing:
-	dh_missing --fail-missing
-
+override_dh_auto_test:
+	# TODO: We need Boost 1.64 or later to build tests for
+	# Apache Arrow Flight.
+	# git clone --depth 1 https://github.com/apache/arrow-testing.git
+	# git clone --depth 1 https://github.com/apache/parquet-testing.git
+	# cd cpp_build &&								\
+	#   env									\
+	#     ARROW_TEST_DATA=$(CURDIR)/arrow-testing/data			\
+	#     PARQUET_TEST_DATA=$(CURDIR)/parquet-testing/data			\
+	#       ctest --exclude-regex 'arrow-cuda-test'
 
 # libarrow.so: avoid failing with "Unknown DWARF DW_OP_172"
 # libgandiva.so: avoid failing with "Unknown DWARF DW_OP_255"
+# libparquet.so: avoid failing with "Unknown DWARF DW_OP_4"
 #   See also: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=949296
-# plasma-store-server: avoid failing with "Unknown DWARF DW_OP_1"
 override_dh_dwz:
 	dh_dwz \
-		--exclude=libarrow.so \
-		--exclude=libgandiva.so \
-		--exclude=plasma-store-server
+	  --exclude=libarrow.so \
+	  --exclude=libgandiva.so \
+	  --exclude=libparquet.so

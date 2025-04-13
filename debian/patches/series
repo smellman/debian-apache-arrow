@@ -1,7 +1,0 @@
-fix-llvm-requirement.patch
-use-debian-xsimd.patch
-#use-debian-jemalloc.patch
-fix-upstream-watch.patch
-allow-setuptools-8.patch
-allow-pytest-8.patch
-python-no-jemalloc.patch

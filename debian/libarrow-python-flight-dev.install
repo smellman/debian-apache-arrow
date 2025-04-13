@@ -1,6 +1,0 @@
-usr/lib/*/cmake/Arrow/ArrowPythonFlightConfig*.cmake
-usr/lib/*/cmake/Arrow/ArrowPythonFlightTargets*.cmake
-usr/lib/*/cmake/Arrow/FindArrowPythonFlight.cmake
-usr/lib/*/libarrow_python_flight.a
-usr/lib/*/libarrow_python_flight.so
-usr/lib/*/pkgconfig/arrow-python-flight.pc

@@ -1,3 +1,9 @@
+apache-arrow (19.0.1-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+
+ -- Taro Matsuzawa <btm@tech.email.ne.jp>  Sun, 13 Apr 2025 14:23:56 +0900
+
 apache-arrow (15.0.2-1) unstable; urgency=medium
 
   [ Diane Trout ]
@@ -28,7 +34,7 @@ apache-arrow (15.0.2-1) unstable; urgency=medium
   * Tell pybuild to use cmake instead of setup.py
   * Configure salsa-ci.yml
 
- -- Taro Matsuzawa <btm@tech.email.ne.jp>  Sun, 13 Apr 2025 14:06:51 +0900
+ -- Taro Matsuzawa <btm@tech.email.ne.jp>  Sun, 13 Apr 2025 14:09:41 +0900
 
 apache-arrow (7.0.0-1) UNRELEASED; urgency=medium
 

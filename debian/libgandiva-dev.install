@@ -1,7 +1,5 @@
 usr/include/gandiva/
-usr/lib/*/cmake/Arrow/GandivaConfig*.cmake
-usr/lib/*/cmake/Arrow/GandivaTargets*.cmake
-usr/lib/*/cmake/Arrow/FindGandiva.cmake
+usr/lib/*/cmake/Gandiva/
 usr/lib/*/libgandiva.a
 usr/lib/*/libgandiva.so
 usr/lib/*/pkgconfig/gandiva.pc
