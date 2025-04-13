@@ -1,11 +1,10 @@
-apache-arrow (19.0.1-4) UNRELEASED; urgency=medium
+apache-arrow (19.0.1-5) UNRELEASED; urgency=medium
 
   * New upstream release
   * Copy debian/ templates from upstream's maintener versions
-  * Revert llvm patch
-  - Disable ORC 
+  * Disable ORC 
 
- -- Taro Matsuzawa <btm@tech.email.ne.jp>  Sun, 13 Apr 2025 22:39:53 +0900
+ -- Taro Matsuzawa <btm@tech.email.ne.jp>  Mon, 14 Apr 2025 07:18:36 +0900
 
 apache-arrow (15.0.2-1) unstable; urgency=medium
 
